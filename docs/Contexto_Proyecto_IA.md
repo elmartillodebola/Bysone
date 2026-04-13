@@ -205,6 +205,7 @@ frontend/src/
 | docs/Plan_Desarrollo_Bysone.md | Plan 4 fases, roles, stack detallado, riesgos |
 | docs/Reglas_Negocio.md | 30 reglas de negocio por dominio |
 | docs/Criterios_Aceptacion.md | 68 criterios de aceptación (BD vs APP) |
+| docs/API_Contracts.md | Contratos API — 11 endpoints, 5 módulos, manejo de errores |
 | docs/Contexto_Proyecto_IA.md | Este archivo |
 | backend/.../V1__create_initial_schema.sql | DDL 16 tablas |
 | backend/.../V2__datos_semilla.sql | Datos semilla |
