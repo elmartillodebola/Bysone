@@ -347,6 +347,153 @@ Luego de forma iterativa, entidad por entidad con capturas de pantalla:
 
 ---
 
+### Prompt 2.12 — Contratos de API entre frontend y backend
+**Fecha:** 2026-04-13
+**Herramienta:** GitHub Copilot (claude-sonnet-4-20250514)
+
+**Qué se pidió:**
+> "Actua como Arquitecto del proyecto y genera los contratos de API entre front y back para la correcta interaccion, ten en cuenta el manejo de errores. revisa los archivos .md con las definiciones actuales y añade los prompt de nuestro chat en prompts_utilizados.md"
+
+**Qué se obtuvo:**
+- Archivo `docs/API_Contracts.md` con contratos completos para 11 endpoints organizados en 5 módulos:
+  1. **Auth** (1 endpoint): `GET /api/v1/usuarios/me` — perfil del usuario con flag `requiereRecalibracion`
+  2. **Calibración** (4 endpoints): listar preguntas, crear encuesta, registrar respuesta, completar encuesta
+  3. **Perfiles y Portafolios** (1 endpoint): listar perfiles con distribución porcentual, portafolios, opciones y fórmulas de exposición
+  4. **Simulación** (4 endpoints): calcular proyección sin persistir, guardar simulación, listar simulaciones paginadas, detalle de simulación
+  5. **Disclaimers** (1 endpoint): obtener disclaimer vigente
+- Convenciones globales: base URL, content-type, autenticación JWT, nomenclatura camelCase, timestamps ISO-8601, precisión decimal
+- Envelope estándar de error con estructura consistente: `timestamp`, `status`, `error`, `code`, `message`, `path`, `details[]`
+- Catálogo de 17 códigos de error (6 generales + 11 de dominio) con HTTP status y módulo
+- Para cada endpoint: método HTTP, path, autenticación, request body/params con tipos y validaciones, response con JSON de ejemplo completo, tabla de campos, y tabla de errores posibles con códigos específicos
+- Ejemplos de error detallados para los escenarios más complejos (409, 422, 403)
+- Matriz resumen de errores por endpoint
+- Tabla resumen de los 11 endpoints
+- Decisión arquitectónica: el endpoint `POST /simulaciones` recalcula server-side la proyección (no confía en datos del frontend) para prevenir manipulación
+
+**Qué se ajustó:**
+- Se añadió endpoint `GET /api/v1/simulaciones/{id}` (no estaba en el plan original pero es necesario para que el historial pueda mostrar el detalle de una simulación guardada)
+- Se incluyó paginación estándar de Spring (`page`, `size`, `sort`) en el listado de simulaciones
+- Se incluyó objeto `resumen` en la respuesta de cálculo/guardado con ganancia esperada y rendimiento porcentual total
+- Se actualizó `prompts_utilizados.md` con este prompt
+- Se actualizó `README.md` con referencia al nuevo documento
+
+---
+
+### Prompt 2.13 — Ajuste contrato error 409 en creación de encuesta
+**Fecha:** 2026-04-13
+**Herramienta:** GitHub Copilot (claude-sonnet-4-20250514)
+
+**Qué se pidió:**
+> "Veo conflictivo el contrato de POST /api/v1/calibracion/encuestas/{idEncuesta}/completar dado que este comando sería consumido por el front end en caso de error 409 en POST /api/v1/calibracion/encuestas (cuando comenzo una encuesta) y el esperaria que el error retorne el id de respuesta para que el front sepa cual encuesta completar"
+
+**Qué se obtuvo:**
+- Actualización del contrato de error `SURVEY_ALREADY_PENDING` (409) en `POST /api/v1/calibracion/encuestas` para incluir un objeto `encuestaPendiente` con:
+  - `id`: PK de la encuesta pendiente (necesario para redirigir al wizard)
+  - `fechaRealizacion`: cuándo se creó
+  - `origen`: si fue por DEMANDA o SISTEMA
+  - `preguntasRespondidas`: progreso actual
+  - `preguntasTotales`: total de preguntas activas
+- Nota explícita para el frontend sobre cómo usar estos datos para retomar el wizard
+- Actualización de la descripción del código de error en el catálogo (sección 3) indicando que incluye `encuestaPendiente` con id y progreso
+
+**Qué se ajustó:**
+- El campo `encuestaPendiente` se añade como extensión del envelope estándar de error (campos adicionales junto a `timestamp`, `status`, `error`, `code`, `message`, `path`, `details`)
+- Se incluyen `preguntasRespondidas` y `preguntasTotales` para que el frontend pueda mostrar la barra de progreso sin una llamada adicional al backend
+
+---
+
+### Prompt 2.14 — Enriquecer error 409 con preguntas pendientes para retomar wizard
+**Fecha:** 2026-04-13
+**Herramienta:** GitHub Copilot (claude-sonnet-4-20250514)
+
+**Qué se pidió:**
+> "el error 409 en POST /api/v1/calibracion/encuestas debe responder con el idEncuesta y las preguntas que faltan por diligenciar para retomar con POST /api/v1/calibracion/encuestas/{idEncuesta}/respuestas y solo está entregando: [JSON con encuestaPendiente sin preguntasPendientes]"
+
+**Qué se obtuvo:**
+- Enriquecimiento del objeto `encuestaPendiente` en el error 409 `SURVEY_ALREADY_PENDING` con el array `preguntasPendientes[]`:
+  - Cada pregunta pendiente incluye: `id`, `textoPregunta`, `orden` y `opciones[]`
+  - Cada opción incluye: `id`, `textoOpcion`, `orden` — **sin `puntaje`** para no exponer la lógica de scoring
+- Tabla detallada de campos de `encuestaPendiente` con tipos y descripciones
+- 4 notas prácticas para el frontend: cómo usar el `id` como path param, cómo iterar `preguntasPendientes`, cómo renderizar barra de progreso, y por qué no se expone `puntaje`
+- Actualización de la descripción de `SURVEY_ALREADY_PENDING` en el catálogo de errores (sección 3)
+
+**Qué se ajustó:**
+- Las opciones de respuesta dentro de `preguntasPendientes` **omiten el campo `puntaje`** a diferencia de `GET /calibracion/preguntas` — decisión de seguridad para no exponer la lógica de scoring durante reanudación
+- El frontend puede retomar el wizard en una sola llamada: el 409 ya trae todo lo necesario sin requerir `GET /calibracion/preguntas` adicional
+
+---
+
+### Prompt 2.15 — Añadir rentabilidad ponderada a nivel de perfil en GET /perfiles
+**Fecha:** 2026-04-13
+**Herramienta:** GitHub Copilot (claude-sonnet-4-20250514)
+
+**Qué se pidió:**
+> "En el contrato, seccion 6.1. GET /api/v1/perfiles — Listar perfiles de inversión hace falta que el contrato entregue rentabilidadMinima, Maxima y media a nivel de cada portafolio"
+
+**Qué se obtuvo:**
+- Actualización del contrato `GET /api/v1/perfiles` con 3 campos nuevos a nivel de perfil:
+  - `rentabilidadMinima`: ponderada (∑ portafolio.rentabilidadMinima × porcentaje / 100)
+  - `rentabilidadMedia`: promedio de mínima y máxima
+  - `rentabilidadMaxima`: ponderada (∑ portafolio.rentabilidadMaxima × porcentaje / 100)
+- Valores de ejemplo alineados con datos semilla: Conservador (3.00–5.00), Moderado (4.80–9.60), Agresivo (6.00–12.00)
+- Tabla de campos actualizada con fórmulas de cálculo
+
+**Qué se ajustó:**
+- Campos calculados server-side por el backend — el frontend los consume directamente para mostrar en `PerfilCard` sin recalcular
+
+---
+
+### Prompt 2.16 — Revisión cruzada API Contracts vs Criterios de Aceptación
+**Fecha:** 2026-04-13
+**Herramienta:** GitHub Copilot (claude-sonnet-4-20250514)
+
+**Qué se pidió:**
+> "ya se revisaron los API_contracts y la lectura es satisfactoria, revisa si cumple los criterios de aceptacion y si hace falta agregar alguno, notificame sin modificar ningun archivo"
+
+**Qué se obtuvo:**
+- Análisis cruzado entre `API_Contracts.md`, `Criterios_Aceptacion.md` y `Reglas_Negocio.md`
+- 10 hallazgos identificados: 2 criterios desactualizados, 1 decisión pendiente, 7 criterios nuevos sugeridos
+- Tabla resumen con tipo de acción, archivo afectado y descripción para cada hallazgo
+- No se modificó ningún archivo
+
+**Qué se ajustó:**
+- N/A — solo análisis, cambios pendientes de aprobación del equipo
+
+---
+
+### Prompt 2.17 — Aplicación de observaciones a Criterios y API Contracts
+**Fecha:** 2026-04-13
+**Herramienta:** GitHub Copilot (claude-sonnet-4-20250514)
+
+**Qué se pidió:**
+> "3. el criterio se cumple al hacer POST o PATCH por el admin, no al obtener la respuesta en el GET
+> 4. la calcula el backend automaticamente
+> 5. agrega el criterio sugerido
+> 6. agrega criterio sugerido
+> 7. agrega criterio
+> 8. agregar criterio
+> 9. agrega criterio
+> 10. dejalo con camel case en ambos casos
+> aplica los cambios de acuerdo a las observaciones numeradas"
+
+**Qué se obtuvo:**
+- **Hallazgo 3 (CA-ORC-05):** Sin cambios — el equipo confirma que el criterio de mínimo 2 opciones por pregunta se valida al momento de crear/editar preguntas (POST/PATCH admin), no al listar en GET
+- **Hallazgo 4 (fechaVencimiento):** Actualización de `API_Contracts.md`:
+  - Añadido campo `fechaVencimiento` en response de `POST /calibracion/encuestas` y `POST /encuestas/{id}/completar`
+  - Documentado como calculado automáticamente por el backend (`fechaRealizacion + INTERVALO_RECALIBRACION_DIAS`), nullable si el parámetro no está configurado
+- **Hallazgo 5:** Nuevo criterio `CA-ENC-09` en `Criterios_Aceptacion.md` — la publicación del evento RabbitMQ no bloquea la transacción de completar encuesta
+- **Hallazgo 6:** Nuevo criterio `CA-USU-11` — fórmula de cálculo de `requiereRecalibracion` (`fechaUltimaActualizacionPerfilInversion` nula o diferencia con fecha actual > `INTERVALO_RECALIBRACION_DIAS`)
+- **Hallazgo 7:** Nuevo criterio `CA-PER-03` — fórmula de rentabilidad ponderada del perfil (∑ portafolio.rentabilidad × porcentaje / 100)
+- **Hallazgo 8:** Nuevo criterio `CA-SIM-09` — aislamiento de simulaciones por usuario (solo propias, 403 si ajena)
+- **Hallazgo 9:** Nuevo criterio `CA-ENC-10` — aislamiento de encuestas por usuario (solo propias, 403 si ajena)
+- **Hallazgo 10:** Nota en convenciones de `API_Contracts.md` — campos de fecha/timestamp generados server-side, `camelCase` en JSON / `snake_case` en BD
+
+**Qué se ajustó:**
+- `Criterios_Aceptacion.md`: 5 criterios nuevos (CA-ENC-09, CA-ENC-10, CA-USU-11, CA-PER-03, CA-SIM-09)
+- `API_Contracts.md`: `fechaVencimiento` añadido a responses de encuestas + nota de convenciones para timestamps
+
+---
+
 ## Etapa 3 · Implementación
 
 > *Los prompts de esta etapa se irán registrando a medida que avancemos.*

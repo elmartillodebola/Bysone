@@ -60,6 +60,7 @@ cd frontend && npm test
 | [docs/Plan_Desarrollo_Bysone.md](docs/Plan_Desarrollo_Bysone.md) | Plan de desarrollo por fases, roles del equipo, stack técnico detallado |
 | [docs/Reglas_Negocio.md](docs/Reglas_Negocio.md) | 30 reglas de negocio organizadas por dominio, derivadas del modelo de datos |
 | [docs/Criterios_Aceptacion.md](docs/Criterios_Aceptacion.md) | 68 criterios de aceptación por entidad, con responsabilidad BD vs aplicación |
+| [docs/API_Contracts.md](docs/API_Contracts.md) | Contratos de API (11 endpoints, 5 módulos) — fuente de verdad front ↔ back |
 | [docs/Contexto_Proyecto_IA.md](docs/Contexto_Proyecto_IA.md) | Contexto completo del proyecto para retomar sesiones con IA sin perder estado |
 
 ### Base de datos

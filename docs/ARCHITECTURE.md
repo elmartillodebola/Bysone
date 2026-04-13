@@ -38,10 +38,25 @@ La aplicación adopta un modelo **multinube** con proveedores especializados por
 
 ## Modelo de dominio
 
-> _Por definir — se completará con la información del equipo._
+| Dominio | Entidades | Endpoints API |
+|---------|-----------|---------------|
+| Auth / Usuarios | `usuarios`, `roles_bysone`, `usuarios_x_rol` | `GET /api/v1/usuarios/me` |
+| Calibración | `preguntas_calibracion`, `opciones_respuesta_calibracion`, `encuestas_calibracion`, `respuestas_encuesta_calibracion` | 4 endpoints en `/api/v1/calibracion/*` |
+| Perfiles / Portafolios | `perfiles_inversion`, `portafolios_inversion`, `opciones_inversion`, `formulas_exposicion` + tablas puente | `GET /api/v1/perfiles` |
+| Simulación | `simulaciones_bysone`, `detalle_proyeccion_simulacion`, `tipos_plazo` | 4 endpoints en `/api/v1/simulaciones/*` |
+| Disclaimers | `disclaimers_bysone` | `GET /api/v1/disclaimers/vigente` |
+
+> Detalle completo en [API_Contracts.md](API_Contracts.md) — 11 endpoints, 17 códigos de error, envelope estándar.
 
 ---
 
 ## Decisiones de arquitectura
 
-> _Por definir — se completará a medida que avance el diseño._
+| # | Decisión | Justificación |
+|---|----------|---------------|
+| ADR-01 | Envelope estándar de error con `code` de dominio | Permite al frontend mapear mensajes de error sin parsear texto libre |
+| ADR-02 | Cálculo server-side en `POST /simulaciones` (recalcula, no confía en frontend) | Previene manipulación de proyecciones — el frontend solo envía inputs |
+| ADR-03 | Snapshot de perfil y tasas en simulación guardada | Reproducibilidad: la simulación es inmutable aunque la configuración del perfil cambie |
+| ADR-04 | Paginación estándar Spring (`page`, `size`, `sort`) en listados | Consistencia con el ecosistema Spring Boot; soporte de ordenamiento dinámico |
+| ADR-05 | Disclaimer como entidad independiente (no en `parametros_bysone`) | Requiere TEXT, ciclo de vida con vigencia, y trazabilidad legal separada |
+| ADR-06 | `camelCase` en JSON, `snake_case` en BD | Convención idiomática para Java/TypeScript en frontend y PostgreSQL en BD |

@@ -119,6 +119,7 @@ Aplican a todas las tablas del modelo.
 |----|----------|-------------|
 | CA-PER-01 | `nombre_perfil_inversion` no puede estar vacío ni superar 100 caracteres. | `[BD/APP]` |
 | CA-PER-02 | `nombre_perfil_inversion` debe ser único en el sistema. | `[APP]` |
+| CA-PER-03 | La `rentabilidadMinima` del perfil es la suma ponderada de `rentabilidadCalculadaVariableMinimo` de cada portafolio por su `porcentaje / 100`. La `rentabilidadMaxima` se calcula análogamente con `rentabilidadCalculadaVariableMaximo`. La `rentabilidadMedia` es `(rentabilidadMinima + rentabilidadMaxima) / 2`. Estos campos son calculados por el backend al servir `GET /api/v1/perfiles`. | `[APP]` |
 
 ### perfiles_inversion_x_portafolios_inversion
 
@@ -154,6 +155,7 @@ Aplican a todas las tablas del modelo.
 | CA-USU-08 | `fecha_ultima_actualizacion_perfil_inversion`, cuando se establece, no puede ser anterior a `fecha_registro`. | `[APP]` |
 | CA-USU-09 | Si `id_perfil_inversion` es nulo, `fecha_ultima_actualizacion_perfil_inversion` también debe ser nula. | `[APP]` |
 | CA-USU-10 | Al asignar o cambiar el perfil de inversión, se debe actualizar simultáneamente `fecha_ultima_actualizacion_perfil_inversion` con la fecha y hora actuales. | `[APP]` |
+| CA-USU-11 | `requiereRecalibracion` es `true` cuando `fechaUltimaActualizacionPerfilInversion` es nula o cuando la diferencia entre la fecha actual del servidor y dicho campo supera el valor del parámetro `INTERVALO_RECALIBRACION_DIAS`. | `[APP]` |
 
 ---
 
@@ -190,6 +192,8 @@ Aplican a todas las tablas del modelo.
 | CA-ENC-06 | `id_perfil_resultado` solo puede establecerse cuando `estado = 'COMPLETADA'`. | `[APP]` |
 | CA-ENC-07 | Al completar la encuesta, `puntaje_total`, `id_perfil_resultado` y `estado` deben actualizarse en la misma transacción. | `[APP]` |
 | CA-ENC-08 | Un usuario no puede tener más de una encuesta en estado `'PENDIENTE'` al mismo tiempo. | `[APP]` |
+| CA-ENC-09 | Si la publicación del evento de notificación (RabbitMQ) falla al completar la encuesta, la calibración debe completarse exitosamente. La notificación es eventual, no bloquea la transacción. | `[APP]` |
+| CA-ENC-10 | Un usuario solo puede registrar respuestas y completar encuestas propias. El acceso a encuestas de otro usuario debe retornar error 403. | `[APP]` |
 
 ### respuestas_encuesta_calibracion
 
@@ -243,6 +247,7 @@ Aplican a todas las tablas del modelo.
 | CA-SIM-06 | El disclaimer referenciado (`id_disclaimer`), si se establece, debe estar activo y dentro de su rango de vigencia al momento de crear la simulación. | `[APP]` |
 | CA-SIM-07 | El usuario que simula debe tener un perfil de inversión asignado (`id_perfil_inversion` en `usuarios` no nulo). | `[APP]` |
 | CA-SIM-08 | Solo se inserta el registro si el usuario confirma explícitamente que desea guardar la simulación. | `[APP]` |
+| CA-SIM-09 | Un usuario solo puede consultar y listar sus propias simulaciones. El acceso a simulaciones de otro usuario debe retornar error 403. | `[APP]` |
 
 ### detalle_proyeccion_simulacion
 
