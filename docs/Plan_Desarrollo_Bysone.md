@@ -1,7 +1,7 @@
 # Plan de Desarrollo — Mi Portafolio Inteligente
 
 > **Hackaton 2026 · Comunidad de Desarrollo de Software · Protección**
-> Arquitectura: Hexagonal · Stack: Spring WebFlux + Next.js 14 · BD: PostgreSQL 16 (Neon)
+> Arquitectura: Hexagonal · Stack: Spring MVC + JPA + Next.js 14 · BD: PostgreSQL 16 (Neon)
 
 ---
 
@@ -22,9 +22,9 @@
 
 | Persona | Rol | Responsabilidad principal |
 |---------|-----|--------------------------|
-| **P1** | Backend — Dominio | Arquitectura hexagonal, lógica de negocio, motor de simulación, APIs reactivas |
+| **P1** | Backend — Dominio | Arquitectura hexagonal, lógica de negocio, motor de simulación, APIs REST |
 | **P2** | Frontend | Next.js, pantallas, flujos UI, integración con API, gráficas |
-| **P3** | DevOps + Backend Infra | Infraestructura, CI/CD, adaptadores R2DBC / RabbitMQ / OAuth2, soporte backend |
+| **P3** | DevOps + Backend Infra | Infraestructura, CI/CD, adaptadores JPA / RabbitMQ / OAuth2, soporte backend |
 
 ---
 
@@ -50,11 +50,11 @@ backend/src/main/java/com/proteccion/portafolio/
 │   └── service/         ← Implementaciones de dominio (sin dependencias de infra)
 ├── application/
 │   └── api/
-│       ├── controller/  ← Controllers WebFlux (adaptadores de entrada REST)
+│       ├── controller/  ← Controllers Spring MVC (adaptadores de entrada REST)
 │       ├── request/     ← DTOs de entrada
 │       └── response/    ← DTOs de salida
 └── infrastructure/
-    ├── persistence/     ← Adaptadores R2DBC (implementan puertos out)
+    ├── persistence/     ← Adaptadores JPA (implementan puertos out)
     ├── messaging/       ← Adaptadores RabbitMQ (producer + consumer)
     ├── oauth/           ← Configuración Spring Security OAuth2
     └── config/          ← Beans, configuración Spring, Flyway
@@ -310,14 +310,13 @@ push main    → CI (build + test) → deploy producción (Fly.io)
 
 | Componente | Tecnología |
 |-----------|------------|
-| Framework | Spring Boot 3 + Spring WebFlux |
-| Reactividad | Project Reactor (`Mono` / `Flux`) |
-| Base de datos | R2DBC + `spring-boot-starter-data-r2dbc` |
-| Migraciones | Flyway (V1 schema + V2 semilla) |
-| Autenticación | Spring Security WebFlux + OAuth2 Resource Server |
+| Framework | Spring Boot 3 + Spring MVC (síncrono/lineal) |
+| Base de datos | JPA + `spring-boot-starter-data-jpa` + PostgreSQL JDBC |
+| Migraciones | Flyway (V1 schema + V2 semilla + V3 roles) |
+| Autenticación | Spring Security + OAuth2 Client + JWT |
 | Mensajería | Spring AMQP (RabbitMQ) |
-| Documentación API | SpringDoc OpenAPI (`springdoc-openapi-webflux-ui`) |
-| Tests | JUnit 5 + Mockito + StepVerifier + WebTestClient |
+| Documentación API | SpringDoc OpenAPI (`springdoc-openapi-starter-webmvc-ui`) |
+| Tests | JUnit 5 + Mockito + MockMvc |
 
 ### Frontend
 
@@ -348,7 +347,7 @@ Fase 0 ────────────────────────�
          │                                           │
          ▼                                           ▼
     Fase 1                                      Fase 1
-  P1: dominio + casos de uso          P3: adaptadores R2DBC + OAuth2
+  P1: dominio + casos de uso          P3: adaptadores JPA + OAuth2
          │                                           │
          └──────────────┬────────────────────────────┘
                         ▼
@@ -370,6 +369,6 @@ Fase 0 ────────────────────────�
 | Riesgo | Impacto | Mitigación |
 |--------|---------|------------|
 | P2 bloqueado esperando endpoints de P1 | Alto | P1 publica contrato OpenAPI al inicio de Fase 1; P2 trabaja con mocks de Axios hasta que los endpoints estén listos |
-| Complejidad R2DBC reactivo | Medio | P3 prioriza los repositorios de `usuarios` y `simulaciones` primero; los demás con menor urgencia |
+| Complejidad JPA con esquema multi-tabla | Bajo | JPA estándar con Hibernate, más maduro y documentado que R2DBC |
 | OAuth2 con múltiples proveedores | Medio | Configurar y probar Google primero; Microsoft al validar el flujo base |
 | Tiempo insuficiente para todos los bonus | Bajo | POO avanzada y cola real están en el diseño desde el inicio; tests y object storage son los que más tiempo toman — priorizar tests |
