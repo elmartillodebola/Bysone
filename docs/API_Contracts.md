@@ -41,7 +41,7 @@
 
 | Enum | Valores válidos |
 |------|----------------|
-| Proveedor OAuth | `GOOGLE`, `MICROSOFT`, `GITHUB` |
+| Proveedor OAuth | `GOOGLE`, `MICROSOFT` |
 | Origen encuesta | `DEMANDA`, `SISTEMA` |
 | Estado encuesta | `PENDIENTE`, `COMPLETADA` |
 | Tipo de plazo | `DÍA`, `MES`, `TRIMESTRE`, `AÑO` |
@@ -155,7 +155,7 @@ Sin body ni query params. El usuario se identifica por el JWT.
 | `nombreCompleto` | `string` | No | Nombre completo (max 200 chars) |
 | `correo` | `string` | No | Email único del usuario |
 | `celular` | `string` | Sí | Celular (solo dígitos, max 20) |
-| `proveedorOauth` | `string` | No | `GOOGLE` \| `MICROSOFT` \| `GITHUB` |
+| `proveedorOauth` | `string` | No | `GOOGLE` \| `MICROSOFT` |
 | `fechaRegistro` | `string` | No | ISO-8601 |
 | `roles` | `string[]` | No | Lista de nombres de roles (`USER`, `ADMIN`, `MAINTAINER`) |
 | `perfilInversion` | `object` | Sí | `null` si no ha completado calibración |

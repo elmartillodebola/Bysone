@@ -1,6 +1,5 @@
 package com.bysone.backend.config;
 
-import com.bysone.backend.security.CustomOAuth2UserService;
 import com.bysone.backend.security.CustomOidcUserService;
 import com.bysone.backend.security.JwtAuthFilter;
 import com.bysone.backend.security.OAuth2AuthSuccessHandler;
@@ -14,6 +13,11 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -22,45 +26,47 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
-    private final CustomOAuth2UserService customOAuth2UserService;   // GitHub (plain OAuth2)
-    private final CustomOidcUserService customOidcUserService;       // Google / Microsoft (OIDC)
+    private final CustomOidcUserService customOidcUserService;
     private final OAuth2AuthSuccessHandler oAuth2AuthSuccessHandler;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-                // Stateless — no sessions
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // Disable CSRF (stateless JWT API)
                 .csrf(AbstractHttpConfigurer::disable)
-                // Authorization rules
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        // Public: OAuth2 login flow + API docs
                         .requestMatchers(
                                 "/oauth2/**",
                                 "/login/**",
+                                "/actuator/health",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**"
                         ).permitAll()
-                        // Admin-only endpoints
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        // Maintainer + Admin
-                        .requestMatchers("/api/maintainer/**").hasAnyRole("ADMIN", "MAINTAINER")
-                        // Everything else needs a valid JWT
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/maintainer/**").hasAnyRole("ADMIN", "MAINTAINER")
                         .anyRequest().authenticated()
                 )
-                // OAuth2 login — GitHub (OAuth2) + Google + Microsoft (OIDC)
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(ui -> ui
-                                .userService(customOAuth2UserService)   // plain OAuth2 (GitHub)
-                                .oidcUserService(customOidcUserService)  // OIDC (Google, Microsoft)
+                                .oidcUserService(customOidcUserService)  // Google (OIDC)
                         )
                         .successHandler(oAuth2AuthSuccessHandler)
                 )
-                // JWT filter runs before Spring's UsernamePasswordAuthenticationFilter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
-}
 
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOriginPatterns(List.of("http://localhost:3000", "https://*.fly.dev"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
+}
