@@ -2,7 +2,7 @@
 
 > Este archivo es una copia de la memoria del asistente IA (Claude Code) sobre el proyecto.
 > Permite retomar cualquier sesión de trabajo con contexto completo sin repetir explicaciones.
-> **Última actualización:** 2026-04-13
+> **Última actualización:** 2026-04-14
 
 ---
 
@@ -30,20 +30,23 @@
 
 ## 2. Stack Tecnológico
 
+> ⚠️ **IMPORTANTE:** el backend usa **Spring MVC (síncrono/lineal) + JPA/Hibernate**, NO WebFlux ni R2DBC.
+> Los contratos de API usan `ResponseEntity<T>` — esto es Spring MVC estándar.
+
 | Capa | Tecnología | Proveedor |
 |------|-----------|-----------|
-| Frontend | Next.js 14+ (React, App Router, TypeScript) | Fly.io — PaaS |
-| Backend | Java 21 + Spring Boot 3 + Spring WebFlux | Fly.io — Contenedor |
-| Base de datos | PostgreSQL 16 + R2DBC (reactivo) | Neon — DBaaS |
+| Frontend | Next.js 14 (React, App Router, TypeScript) | Fly.io — PaaS |
+| Backend | Java 21 + Spring Boot 3 + Spring MVC (síncrono) | Fly.io — Contenedor |
+| Base de datos | PostgreSQL 16 + JPA/Hibernate (JDBC) | Neon — DBaaS |
 | Cola de mensajes | RabbitMQ | Fly.io — Contenedor |
-| Autenticación | OAuth2 (Google Workspace + Microsoft 365) | — |
-| Migraciones BD | Flyway (V1 schema + V2 semilla) | — |
+| Autenticación | OAuth2 (Google Workspace + Microsoft 365) — NO GitHub | — |
+| Migraciones BD | Flyway (V1 schema + V2 semilla + V3 roles) | — |
 | CI/CD | GitHub Actions → Fly.io deploy | GitHub |
-| Asistentes IA | GitHub Copilot + Claude Code | — |
+| Asistentes IA | Claude Code (claude-sonnet-4-6) | — |
 
 **Librerías frontend clave:** Tailwind CSS · shadcn/ui · NextAuth.js v5 · Axios · TanStack Query · React Hook Form + Zod · Recharts
 
-**Librerías backend clave:** Spring WebFlux · R2DBC · Spring Security OAuth2 · Spring AMQP · SpringDoc OpenAPI · JUnit 5 + StepVerifier
+**Librerías backend clave:** Spring MVC · JPA/Hibernate · Spring Security OAuth2 · Spring AMQP · SpringDoc OpenAPI · JUnit 5 + Mockito · Spring Actuator
 
 ---
 
@@ -52,14 +55,14 @@
 ### Flujo de comunicación
 
 ```
-Next.js (3000) ──HTTPS──▶ Spring Boot WebFlux API (8080)
+Next.js (3000) ──HTTPS──▶ Spring Boot MVC API (8080)
                                     │
                      ┌──────────────┼──────────────┐
                      │              │              │
               Neon PostgreSQL   RabbitMQ       Swagger UI
-              (R2DBC reactivo)  (broker)       (/swagger-ui.html)
+              (JDBC / JPA)      (broker)       (/swagger-ui.html)
                                     │
-                            Notification Worker
+                            NotificacionConsumer
                                     │
                                SMTP / Email
 ```
@@ -67,36 +70,28 @@ Next.js (3000) ──HTTPS──▶ Spring Boot WebFlux API (8080)
 ### CI/CD
 
 ```
-push develop → GitHub Actions → build + test → deploy staging  (Fly.io)
-push main    → GitHub Actions → build + test → deploy producción (Fly.io)
+push develop → GitHub Actions (ci.yml)  → build + test
+push main    → GitHub Actions (ci.yml)  → build + test
+                            ↓
+              deploy-backend.yml → flyctl deploy (bysone-backend)
+              deploy-frontend.yml → flyctl deploy (bysone-frontend)
 ```
 
-### Estructura hexagonal del backend
+### Estructura real del backend (implementada)
 
 ```
-backend/src/main/java/com/proteccion/portafolio/
-├── domain/
-│   ├── model/           ← Entidades puras (sin Spring)
-│   │   ├── usuario/
-│   │   ├── perfil/
-│   │   ├── simulacion/
-│   │   └── calibracion/
-│   ├── port/
-│   │   ├── in/          ← Interfaces casos de uso
-│   │   └── out/         ← Interfaces repos y servicios externos
-│   └── service/         ← Motor simulación, scoring calibración
-├── application/api/
-│   ├── controller/      ← Controllers WebFlux (Mono/Flux)
-│   ├── request/
-│   └── response/
-└── infrastructure/
-    ├── persistence/     ← Adaptadores R2DBC
-    ├── messaging/       ← Producer/Consumer RabbitMQ
-    ├── oauth/           ← Config Spring Security OAuth2
-    └── config/          ← Beans, Flyway, SpringDoc
+backend/src/main/java/com/bysone/backend/
+├── domain/               ← Entidades JPA (@Entity)
+├── repository/           ← Spring Data JPA interfaces
+├── dto/
+│   ├── request/          ← Records de entrada
+│   └── response/         ← Records de salida
+├── service/              ← Lógica de negocio
+├── controller/           ← @RestController Spring MVC
+├── security/             ← JWT + OAuth2 handlers
+├── config/               ← SecurityConfig, RabbitMqConfig, OpenApiConfig, GlobalExceptionHandler
+└── messaging/            ← NotificacionProducer, NotificacionConsumer
 ```
-
-> Regla estricta: el dominio no puede importar nada de Spring ni de infrastructure. Los controllers solo orquestan, nunca contienen lógica de negocio.
 
 ### Estructura del frontend (Next.js 14 App Router)
 
@@ -114,18 +109,19 @@ frontend/src/
 │   │   └── perfil/page.tsx                ← Detalle perfil y portafolios
 │   └── api/auth/[...nextauth]/route.ts    ← Handler NextAuth
 ├── components/
-│   ├── ui/              ← shadcn/ui base
-│   ├── calibracion/     ← PreguntaCard, BarraProgreso, ResultadoPerfil
-│   ├── simulacion/      ← FormularioSimulacion, GraficaProyeccion, HistorialItem
-│   ├── perfil/          ← PerfilCard, PortafolioBreakdown
-│   └── shared/          ← Header, Navbar, Spinner, ErrorBoundary
+│   ├── ui/Button.tsx
+│   ├── calibracion/  ← PreguntaCard, BarraProgreso
+│   ├── simulacion/   ← FormularioSimulacion, GraficaProyeccion, HistorialItem
+│   ├── perfil/       ← PerfilCard, PortafolioBreakdown
+│   └── shared/       ← Header, Navbar, Spinner, Providers
 ├── hooks/
-│   ├── useSimulacion.ts ← Estado pre-guardado en memoria (hasta confirmar guardar)
-│   └── useCalibracion.ts← Avance del wizard
+│   ├── useSimulacion.ts
+│   └── useCalibracion.ts
 └── lib/
     ├── api.ts           ← Axios + interceptores JWT
-    ├── auth.ts          ← NextAuth (Google + Microsoft)
+    ├── auth.ts          ← NextAuth v5 (Google + Microsoft)
     ├── types.ts         ← Tipos TypeScript compartidos
+    ├── utils.ts         ← formatCurrency, formatPercent
     └── queryClient.ts   ← TanStack Query config
 ```
 
@@ -133,117 +129,106 @@ frontend/src/
 
 ## 4. Modelo de Datos
 
-**DDL:** `backend/src/main/resources/db/migration/V1__create_initial_schema.sql` — 16 tablas
-**Semilla:** `backend/src/main/resources/db/migration/V2__datos_semilla.sql` — hasta 5 registros por entidad
+**DDL:** `backend/src/main/resources/db/migration/V1__create_initial_schema.sql` — 16 tablas  
+**Semilla:** `backend/src/main/resources/db/migration/V2__datos_semilla.sql`  
+**Ajuste nomenclatura:** `backend/src/main/resources/db/migration/V3__rename_roles.sql`
 
 ### Dominios y tablas
 
 | Dominio | Tablas |
 |---------|--------|
-| Roles y acceso | `roles_bysone`, `opciones_funcionales_bysone`, `roles_x_opcion_funcional` |
+| Acceso | `roles` |
 | Parámetros | `parametros_bysone` |
-| Inversión | `portafolios_inversion`, `opciones_inversion`, `portafolio_inversion_x_opciones_inversion` |
-| Perfiles | `perfiles_inversion`, `perfiles_inversion_x_portafolios_inversion`, `formulas_exposicion` |
-| Usuarios | `usuarios`, `usuarios_x_rol` |
+| Inversión | `portafolios_inversion`, `opciones_inversion` |
+| Perfiles | `perfiles_inversion`, `perfil_portafolio` (junction), `formulas_exposicion` |
+| Usuarios | `usuarios` (con FK a `perfiles_inversion`) |
 | Calibración | `preguntas_calibracion`, `opciones_respuesta_calibracion`, `encuestas_calibracion`, `respuestas_encuesta_calibracion` |
-| Simulación | `tipos_plazo`, `disclaimers_bysone`, `simulaciones_bysone`, `detalle_proyeccion_simulacion` |
-
-### Decisiones de diseño del modelo
-
-| Decisión | Detalle |
-|----------|---------|
-| PKs | BIGSERIAL — auto-incremental, siempre > 0 |
-| Perfiles normalizados | Sin grupos repetidos; porcentaje en tabla puente `perfiles_inversion_x_portafolios_inversion` |
-| OAuth en usuarios | `oauth_sub VARCHAR(255) UNIQUE` + `proveedor_oauth` con CHECK ('GOOGLE', 'MICROSOFT') |
-| Simulación maestro-detalle | Solo persiste si usuario confirma; snapshot de tasas en detalle para reproducibilidad |
-| Disclaimers independientes | Tabla propia con `TEXT` y vigencia desde/hasta — no usar `parametros_bysone` para texto legal |
-| Plazo con catálogo | `tipos_plazo` con `factor_conversion_dias` normaliza DÍA/MES/TRIMESTRE/AÑO para el motor |
-| Calibración | `puntaje_total` persistido al completar; CHECK en `origen` ('DEMANDA','SISTEMA') y `estado` ('PENDIENTE','COMPLETADA') |
-| Snapshot perfil | `nombre_perfil_simulado` en simulaciones — el perfil puede cambiar después |
-| UNIQUE exposición | `formulas_exposicion` tiene UNIQUE en `(id_perfil_inversion, id_portafolio_inversion)` |
-
-### Datos semilla incluidos
-
-- 3 roles, 5 opciones funcionales, 5 parámetros de sistema
-- 3 portafolios, 5 opciones de inversión, 3 perfiles (Conservador / Moderado / Agresivo)
-- 4 tipos de plazo, 2 disclaimers (1 activo + 1 histórico)
-- 3 usuarios: Ana (admin+usuario, perfil Moderado), Carlos (asesor+usuario, perfil Conservador), María (pendiente calibración)
-- 2 simulaciones con proyección calculada matemáticamente por período
+| Simulación | `tipos_plazo`, `disclaimers`, `simulaciones`, `detalles_proyeccion` |
 
 ---
 
 ## 5. Estado de Avance
 
-**Fecha:** 2026-04-13
+**Fecha:** 2026-04-14
 
 | Etapa | Estado |
 |-------|--------|
-| 1. Entendimiento del problema | Completada (4 prompts) |
-| 2. Diseño y arquitectura | Completada (10 prompts) |
-| 3. Implementación | **Pendiente — siguiente paso** |
+| 1. Entendimiento del problema | ✅ Completada |
+| 2. Diseño y arquitectura | ✅ Completada |
+| 3. Implementación — Fase A (infra + frontend) | ✅ Completada |
+| 3. Implementación — Fase B (backend) | ✅ Completada |
+| 3. Implementación — Fase C (CI/CD + despliegue) | 🔄 En curso |
 | 4. Pruebas y calidad | Pendiente |
-| 5. Despliegue y entrega | Pendiente |
+| 5. Entrega final | Pendiente |
 
 ### Entregables de la hackaton
 
 | Entregable | Estado |
 |-----------|--------|
-| Repositorio Git | Creado — github.com/elmartillodebola/Bysone |
-| App desplegada | Pendiente |
-| Tests unitarios | Pendiente |
-| Diseño previo | Completado (modelo datos, reglas, criterios, plan) |
-| Prompts utilizados con IA | En curso (14 prompts registrados) |
+| Repositorio Git | ✅ Creado |
+| App desplegada | Pendiente — config Fly.io lista, falta `fly apps create` |
+| Tests unitarios | ✅ 4 tests SimulacionService (BUILD SUCCESS) |
+| Diseño previo | ✅ Completado |
+| Prompts utilizados con IA | ✅ 18+ prompts registrados (Etapas 1-3) |
 | Demo en vivo | Pendiente |
-| Documentación | En curso (README + 4 docs en docs/) |
+| Documentación | ✅ 7 docs en `docs/` incluyendo `Codificacion_asistida_bysone.md` |
 
-### Archivos existentes en el repositorio
+### Archivos clave generados (Fase B y C)
 
 | Archivo | Descripción |
 |---------|-------------|
-| README.md | Punto de entrada, inicio rápido, tabla de docs |
-| docs/ARCHITECTURE.md | Stack y servicios en nube |
-| docs/Plan_Desarrollo_Bysone.md | Plan 4 fases, roles, stack detallado, riesgos |
-| docs/Reglas_Negocio.md | 30 reglas de negocio por dominio |
-| docs/Criterios_Aceptacion.md | 68 criterios de aceptación (BD vs APP) |
-| docs/API_Contracts.md | Contratos API — 11 endpoints, 5 módulos, manejo de errores |
-| docs/Contexto_Proyecto_IA.md | Este archivo |
-| backend/.../V1__create_initial_schema.sql | DDL 16 tablas |
-| backend/.../V2__datos_semilla.sql | Datos semilla |
-| prompts_utilizados.md | 14 prompts registrados |
-
-### Archivos pendientes de crear
-
-- `docs/DEVELOPMENT.md` — guía de desarrollo local y convenciones
-- `docs/DEPLOYMENT.md` — configuración Fly.io y pipelines
-- `docker-compose.yml` — entorno local completo
-- `.env.example` — variables de entorno sin valores
-- `frontend/` — proyecto Next.js
-- `backend/` — proyecto Spring Boot (solo existe la carpeta de migraciones)
-- `broker/` — configuración RabbitMQ
-- `.github/workflows/` — pipelines CI/CD
+| `docker-compose.yml` | postgres + rabbitmq + mailhog + backend + frontend |
+| `.env.example` | Todas las variables con instrucciones |
+| `backend/Dockerfile` | Multistage eclipse-temurin:21 |
+| `frontend/Dockerfile` | Multistage node:20-alpine standalone |
+| `backend/fly.toml` | Config Fly.io: shared-cpu-1x, health check /actuator/health |
+| `frontend/fly.toml` | Config Fly.io: shared-cpu-1x, health check / |
+| `.github/workflows/ci.yml` | Build+test backend y frontend en paralelo |
+| `.github/workflows/deploy-backend.yml` | Deploy a Fly.io en push a main |
+| `.github/workflows/deploy-frontend.yml` | Deploy a Fly.io en push a main |
+| `docs/Codificacion_asistida_bysone.md` | Inventario completo de código IA (~120 archivos) |
 
 ---
 
-## 6. Próximo Paso — Etapa 3: Implementación
+## 6. Próximo Paso — Despliegue supervisado
 
-Seguir el plan en `docs/Plan_Desarrollo_Bysone.md`, comenzando por la **Fase 0**:
+```bash
+# 1. Levantar infraestructura local (supervisado con el equipo)
+docker compose up --build
 
-1. **P3:** Crear `docker-compose.yml` y `.env.example`, configurar ramas en GitHub
-2. **P1:** Crear proyecto Spring Boot 3 con estructura hexagonal y dependencias WebFlux + R2DBC
-3. **P2:** Crear proyecto Next.js 14 con App Router, NextAuth.js y estructura de carpetas
-4. Validar que `docker compose up` levanta todos los servicios y Flyway aplica V1 + V2
+# 2. Crear apps en Fly.io (una sola vez)
+fly apps create bysone-backend
+fly apps create bysone-frontend
+
+# 3. Configurar secretos de producción
+fly secrets set --app bysone-backend DATABASE_URL=... JWT_SECRET=... \
+  GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... \
+  MICROSOFT_CLIENT_ID=... MICROSOFT_CLIENT_SECRET=... \
+  RABBITMQ_HOST=... RABBITMQ_USERNAME=... RABBITMQ_PASSWORD=... \
+  FRONTEND_URL=https://bysone-frontend.fly.dev
+
+fly secrets set --app bysone-frontend \
+  NEXTAUTH_SECRET=... NEXTAUTH_URL=https://bysone-frontend.fly.dev \
+  NEXT_PUBLIC_API_URL=https://bysone-backend.fly.dev \
+  GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... \
+  MICROSOFT_CLIENT_ID=... MICROSOFT_CLIENT_SECRET=...
+
+# 4. Primer deploy manual
+fly deploy --app bysone-backend --remote-only
+fly deploy --app bysone-frontend --remote-only
+```
 
 ---
 
 ## 7. Convenciones de Trabajo con IA
 
-**Registro de prompts:** Cada tarea relevante debe quedar registrada en `prompts_utilizados.md` con:
-- El prompt literal (no parafraseado)
-- Qué se obtuvo
-- Qué se ajustó
-- Numeración por etapa (3.x para Implementación)
+**Registro de prompts:** Cada tarea relevante debe quedar registrada en `prompts_utilizados.md`.
 
-**Regla de memoria:** Este archivo debe actualizarse al final de cada sesión de trabajo significativa para que cualquier integrante del equipo pueda retomar con la IA sin perder contexto.
+**Regla de memoria:** Este archivo debe actualizarse al final de cada sesión de trabajo significativa.
+
+**Stack no negociable:** Spring MVC + JPA (síncrono). Nunca WebFlux, R2DBC, Mono ni Flux.
+
+**OAuth2:** Solo Google + Microsoft para login de usuarios. GitHub es solo para CI/CD (GITHUB_TOKEN).
 
 ---
 

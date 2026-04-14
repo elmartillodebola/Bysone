@@ -8,6 +8,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import com.bysone.backend.domain.PerfilInversion;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.HashSet;
@@ -44,6 +45,10 @@ public class Usuario implements UserDetails {
 
     @Column(name = "fecha_ultima_actualizacion_perfil_inversion")
     private LocalDateTime fechaUltimaActualizacionPerfilInversion;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_perfil_inversion")
+    private PerfilInversion perfilInversion;
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
