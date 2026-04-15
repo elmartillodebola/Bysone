@@ -3,6 +3,8 @@ primary_region = "mia"
 
 [build]
   dockerfile = "Dockerfile"
+  [build.args]
+    NEXT_PUBLIC_API_URL = "https://bysone-backend.fly.dev"
 
 [env]
   PORT = "3000"

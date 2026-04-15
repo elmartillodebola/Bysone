@@ -1,3 +1,0 @@
-[build]
-  [build.args]
-    NEXT_PUBLIC_API_URL = "https://bysone-backend.fly.dev"
