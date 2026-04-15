@@ -36,7 +36,6 @@ docker compose up --build
 | Frontend (Next.js) | http://localhost:3000 |
 | Backend API | http://localhost:8080 |
 | Swagger UI | http://localhost:8080/swagger-ui.html |
-| RabbitMQ Management | http://localhost:15672 |
 
 ### 4. Ejecutar tests
 

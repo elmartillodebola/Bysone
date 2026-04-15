@@ -49,7 +49,8 @@ public class CalibracionController {
                         put("encuestaPendiente", java.util.Map.of(
                                 "id", ex.getEncuestaPendiente().getId(),
                                 "fechaRealizacion", ex.getEncuestaPendiente().getFechaRealizacion().toString(),
-                                "origen", ex.getEncuestaPendiente().getOrigen()
+                                "origen", ex.getEncuestaPendiente().getOrigen(),
+                                "preguntasRespondidas", ex.getPreguntasRespondidas()
                         ));
                     }}
             );

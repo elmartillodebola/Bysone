@@ -30,14 +30,21 @@ export function useCalibracion(preguntas: PreguntaCalibracion[]) {
       setPasoActual(0)
     } catch (err: unknown) {
       const apiErr = err as {
-        response?: { data?: { code?: string; encuestaPendiente?: { id: number } } }
+        response?: {
+          data?: {
+            code?: string
+            encuestaPendiente?: { id: number; preguntasRespondidas?: number }
+          }
+        }
       }
       if (
         apiErr.response?.data?.code === 'SURVEY_ALREADY_PENDING' &&
         apiErr.response.data.encuestaPendiente
       ) {
-        setIdEncuesta(apiErr.response.data.encuestaPendiente.id)
-        setPasoActual(0)
+        const { id, preguntasRespondidas = 0 } = apiErr.response.data.encuestaPendiente
+        setIdEncuesta(id)
+        // Retomar desde la primera pregunta sin responder
+        setPasoActual(Math.min(preguntasRespondidas, preguntas.length - 1))
       } else {
         setError('No se pudo iniciar la encuesta')
       }
@@ -63,8 +70,16 @@ export function useCalibracion(preguntas: PreguntaCalibracion[]) {
       if (pasoActual < preguntas.length - 1) {
         setPasoActual((p) => p + 1)
       }
-    } catch {
-      setError('Error al registrar la respuesta')
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { status?: number } }
+      if (apiErr.response?.status === 409) {
+        // Pregunta ya respondida (puede ocurrir si el estado se reinició): avanzar igual
+        if (pasoActual < preguntas.length - 1) {
+          setPasoActual((p) => p + 1)
+        }
+      } else {
+        setError('Error al registrar la respuesta')
+      }
     } finally {
       setCargando(false)
     }

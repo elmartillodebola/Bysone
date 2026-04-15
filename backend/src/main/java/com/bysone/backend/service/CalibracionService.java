@@ -159,14 +159,17 @@ public class CalibracionService {
     // Excepción interna para encuesta pendiente (409)
     public static class EncuestaPendienteException extends ResponseStatusException {
         private final EncuestaCalibracion encuestaPendiente;
+        private final int preguntasRespondidas;
 
         public EncuestaPendienteException(EncuestaCalibracion enc,
                                           PreguntaCalibracionRepository preguntaRepo,
                                           RespuestaEncuestaCalibracionRepository respuestaRepo) {
             super(HttpStatus.CONFLICT, "SURVEY_ALREADY_PENDING");
             this.encuestaPendiente = enc;
+            this.preguntasRespondidas = respuestaRepo.countByEncuestaCalibracionId(enc.getId());
         }
 
         public EncuestaCalibracion getEncuestaPendiente() { return encuestaPendiente; }
+        public int getPreguntasRespondidas() { return preguntasRespondidas; }
     }
 }

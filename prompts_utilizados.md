@@ -660,3 +660,209 @@ Luego de forma iterativa, entidad por entidad con capturas de pantalla:
 
 **Qué se ajustó:**
 - N/A — primera implementación de CI/CD
+
+---
+
+### Prompt 3.6 — Consolidación de migraciones y corrección de flujo de calibración
+**Fecha:** 2026-04-14
+**Herramienta:** Claude Code (claude-sonnet-4-6)
+
+**Qué se pidió:**
+> "quisiera que las opciones_respuesta_calibracion, quedara en el mismo de datos semilla, para no llenarnos de archivos, lo mismo revisa el v3_rename_roles y considera ponerlo en el v1 o en datos semilla según su objetivo así solo tendrías dos archivos por ahora para el tema de la bd"
+
+> "procede con los pasos directamente, reiniciando el proyecto y verificando paso a paso que todo lo del front lo tenemos implementado según las especificaciones que usamos"
+
+> "no me esta funcionando al parecer memorizo elementos de mi sesion, le di cerrar sesion y no me funciona y no me carga las preguntas, podrías reiniciar todo para que podamos iniciar desde cero y continuar con las pruebas y ajustes"
+
+> "algo hicimos mal entre versiones la calibración funcionaba perfecto en la primera corrida, lo único que nos faltaban eran opciones de respuesta a las preguntas, las adicionaste, corremos de nuevo el proyecto, le cambiaste los puertos, devolvimos los puertos y usamos los iniciales, se agregó código de error si las opciones para cada pregunta no están disponibles, pero ya la simulación no funciona — revisala a fondo pues es una funcionalidad sencilla pedir la respuesta a una pregunta y pasar a la siguiente pero al cargar y contestar una pregunta no pasa a la siguiente sino que vuelve y aparece el error que se adicionó"
+
+**Qué se obtuvo:**
+- `V3__rename_roles.sql` y `V4__opciones_calibracion.sql` eliminados; todo consolidado en `V2__datos_semilla.sql`
+- `V2` ahora incluye: roles corregidos (ADMIN/MAINTAINER/USER), las 15 opciones de respuesta (3 × 5 preguntas), y el parámetro `TIMEOUT_SESION_INACTIVIDAD_MINUTOS = '5'`
+- `application-local.yaml` creado para desarrollo local sin necesidad de exportar variables de entorno
+- Corrección en `JwtAuthFilter`: try/catch alrededor de `extractUsername` para devolver 403 en lugar de 500 en tokens inválidos
+- `frontend/.env.local` creado con `NEXT_PUBLIC_API_URL=http://localhost:8080`
+- `api.ts` actualizado: manejo de 403 igual que 401 (limpiar token + redirigir a /login)
+- `auth/callback/page.tsx` reescrito con `<Suspense>` para cumplir requisito de Next.js con `useSearchParams`
+- `useCalibracion.ts` corregido: al recibir 409 en `iniciar()` lee `preguntasRespondidas` y posiciona `pasoActual`; al recibir 409 en `responder()` avanza al siguiente paso en lugar de mostrar error
+
+**Qué se ajustó:**
+- Los puertos se fijaron definitivamente: backend 8080, frontend 3000; procesos conflictivos se deben matar antes de iniciar
+- `Header.tsx`: campo corregido de `correoUsuario` a `correo` alineando con el DTO `UsuarioMeResponse`
+- `RespuestaEncuestaCalibracionRepository`: añadido `countByEncuestaCalibracionId(Long)` con retorno `int`
+- `CalibracionService.EncuestaPendienteException`: ahora incluye `preguntasRespondidas` calculado vía el repositorio
+- `CalibracionController`: el body del 409 incluye `preguntasRespondidas` en el objeto `encuestaPendiente`
+
+---
+
+### Prompt 3.7 — BR-CAL-001, BR-SES-001, useInactividad y tests
+**Fecha:** 2026-04-14
+**Herramienta:** Claude Code (claude-sonnet-4-6)
+
+**Qué se pidió:**
+> "convierte esta solución en regla de negocio, de paso quiero que incluyas reglas de negocio relacionadas con el inicio de sesión que indican que la sesión debe vencer cada 5 minutos sin actividad, dejando ese tiempo en los parámetros para ser configurado, obligando al inicio de sesión nuevamente, por otro lado quiero que comenzar a implementar ese control de tiempo para la sesión y que implementemos el botón de cierre de sesión, antes de continuar con las demás pruebas, inclúyelo también en los tests"
+
+**Qué se obtuvo:**
+- `docs/Reglas_Negocio.md` actualizado con dos reglas nuevas:
+  - **BR-CAL-001**: encuesta retomable — el 409 en creación incluye `preguntasRespondidas`; el frontend retoma desde ese paso sin tocar respuestas previas
+  - **BR-SES-001**: timeout de inactividad configurable via `parametros_bysone`; el frontend consulta `/api/v1/config/sesion` y activa un temporizador que se reinicia con cualquier evento del usuario
+- `ConfiguracionService.java` — lee `TIMEOUT_SESION_INACTIVIDAD_MINUTOS` de BD, fallback 5 min
+- `ConfiguracionController.java` — expone `GET /api/v1/config/sesion` sin autenticación
+- `SecurityConfig.java` — `/api/v1/config/**` añadido a `permitAll()`
+- `frontend/src/hooks/useInactividad.ts` — hook que consulta el endpoint, activa timer en eventos de usuario, al vencer limpia token y redirige a `/login`, limpieza total al desmontar
+- `AuthGuard.tsx` — integra `useInactividad()` como única línea adicional
+- `Header.tsx` — botón "Cerrar sesión" ya correcto (limpia `bysone_token` + `router.replace('/login')`)
+- Tests backend: `ConfiguracionServiceTest.java` (3 casos) + `CalibracionReglaNegocioTest.java` (3 casos) — **6/6 pasando**
+- Test frontend: `useInactividad.test.ts` (4 casos con fake timers y mocks de router/api) — **4/4 pasando**
+- `ts-node` instalado como devDependency en el frontend (requerido por `jest.config.ts`)
+
+**Qué se ajustó:**
+- N/A — primera implementación completa de la funcionalidad de sesión
+
+---
+
+### Prompt 3.8 — Roles, permisos, menú de Configuración y gestión de parámetros
+**Fecha:** 2026-04-14
+**Herramienta:** Claude Code (claude-sonnet-4-6)
+
+**Qué se pidió:**
+> "antes de continuar quiero entender como manejaremos el tema de roles y permisos según la opción funcional y el rol, por lo que estimamos, solo tendremos un menú que será el de configuraciones de Bysone, que será de acceso solo para el rol administrador, las demás funciones las deben acceder todos los tipos de usuarios administradores y no administradores"
+
+> "incluye en el tema de administración nuevos parámetros y ajustes de parámetros, y procede con tu propuesta complementada con la nuestra"
+
+**Qué se obtuvo:**
+- `V2__datos_semilla.sql` actualizado: nueva opción funcional `GESTIONAR_PARAMETROS` (id=6) y asignación completa de roles:
+  - ADMIN: las 6 opciones (incluyendo `GESTIONAR_PARAMETROS`)
+  - MAINTAINER: perfiles, portafolios, simulación, historial
+  - USER: simulación, historial
+- `OAuth2AuthSuccessHandler.java`: JWT ahora incluye claim `roles: ["ADMIN"]` para que el frontend controle visibilidad del menú
+- `AdminParametrosController.java`: CRUD completo en `/api/v1/admin/parametros` — listar, obtener por ID, buscar por nombre, crear (con normalización de nombre), actualizar valor. Protegido con `@PreAuthorize("hasRole('ADMIN')")`
+- `useCurrentUser.ts`: hook frontend que expone `usuario`, `isLoading` y `esAdmin` (lee `/usuarios/me`)
+- `Navbar.tsx`: muestra el ítem "Configuración" solo cuando `esAdmin = true`
+- `/admin/page.tsx`: página de administración con tabla editable de parámetros y formulario para agregar nuevos. Redirige al inicio si el usuario no es ADMIN
+- `docs/Reglas_Negocio.md`: nuevas reglas BR-ROL-001 a BR-ROL-004 y BR-PAR-001 a BR-PAR-003
+
+**Qué se ajustó:**
+- El Navbar mejoró su lógica de active-link: usa `pathname.startsWith(href)` con excepción para `/` para que "Configuración" también se marque activo en subrutas `/admin/*`
+- Los parámetros no se pueden eliminar desde la interfaz (solo crear y editar) para preservar el historial de configuración del sistema
+
+---
+
+### Prompt 3.9 — Documentación de reglas de negocio de roles y parámetros
+**Fecha:** 2026-04-14
+**Herramienta:** Claude Code (claude-sonnet-4-6)
+
+**Qué se pidió:**
+> "Estaremos haciendo varios cambios creo que no es necesario reiniciar el backend y el proyecto hasta que acumulemos los cambios que queremos probar, por favor crea estas nuevas reglas de negocio en el archivo de reglas de negocio md"
+
+**Qué se obtuvo:**
+- `docs/Reglas_Negocio.md` actualizado con 7 nuevas reglas en sus secciones correspondientes:
+  - **Sección 2 — Roles:** BR-ROL-001 (tabla roles × opciones), BR-ROL-002 (funciones abiertas vs. exclusivas ADMIN), BR-ROL-003 (roles en JWT y `/me`), BR-ROL-004 (protección doble frontend + backend 403)
+  - **Sección 8 — Parámetros:** BR-PAR-001 (solo ADMIN gestiona, cambios en caliente), BR-PAR-002 (normalización de nombre, unicidad), BR-PAR-003 (parámetros no se eliminan por interfaz)
+- Fecha del documento actualizada a 2026-04-14
+
+**Qué se ajustó:**
+- N/A — solo documentación
+
+---
+
+## Etapa 3.9.1 — PASOS 1-10: Implementación completa de CRUDs Admin
+
+---
+
+### Prompt 3.9.1 — PASO 1: Configuración de Roles × Opciones Funcionales
+**Fecha:** 2026-04-14
+**Herramienta:** GitHub Copilot (claude-sonnet-4-20250514)
+
+**Qué se pidió:**
+> "agregemos la funcionalidad de los demas Cruds en el menu de configuracion y que son requeridos segun el modelo de datos ejemplo: opciones de inversion, portafolios, etc. incluye las validaciones de campos que cumplan con los criterios de aceptotación e incluyamos los test, agrega este en los prompts, si resultan nuevas reglas de negocio las incluimos o neuvos criterios tambien, de esta forma dejemsop todos los cruds listos. Lista el trabajo define plan y vamos paso a paso para uqe sea controlado"
+
+Luego: `"coo recomiendas iniciemos genera aca la lista de lso pasos y muestrame el plan y te doy el go despues"`
+
+Finalmente: `"vamos adelante"`
+
+**Qué se obtuvo:**
+- Plan de 10 pasos (PLAN_IMPLEMENTACION_CRUDs_ADMIN.md) con estructura jerárquica:
+  - **Fase 1 (Fundación):** Roles×Opciones → Encuesta Calibración → Perfiles Básicos (15 tests)
+  - **Fase 2 (Inversiones):** Portafolio×Opción → Perfil×Portafolio → Fórmulas (12 tests)
+  - **Fase 3 (Información):** Disclaimers (4 tests)
+  - **Fase 4 (Interfaz):** Frontend, Documentación, Integración (3 tests)
+- **PASO 1 Ejecución** — Configuración de Roles × Opciones Funcionales:
+  - **Entidades JPA:**
+    - `OpcionFuncional`: id, nombreOpcionFuncional
+    - `RolesXOpcionFuncional`: relación M2M con claves compuestas (idRol, idOpcion)
+    - `RolesXOpcionFuncionalId`: clase para clave compuesta (@IdClass)
+  - **Repositorios:**
+    - `OpcionFuncionalRepository`: findByNombreOpcionFuncional()
+    - `RolesXOpcionFuncionalRepository`: findByIdRol(), findByIdOpcion()
+  - **DTOs:**
+    - `OpcionFuncionalRequest`: validación @NotBlank, @Size(max=150)
+    - `OpcionFuncionalResponse`: id, nombreOpcionFuncional
+    - `AsignarOpcionARolRequest`: idRol, idOpcion con @NotNull
+    - `RolOpcionResponse`: respuesta de asignación con nombres
+  - **Servicio:** `RolesOpcionesService`
+    - `asignarOpcionARole(idRol, idOpcion)`: validación CA-RXO-01 (no duplicar)
+    - `desasignarOpcionDelRol(idRol, idOpcion)`
+    - `obtenerOpcionesDelRol(idRol)`
+    - `obtenerTodosLosRoles()`, `obtenerTodasLasOpciones()`
+  - **Controlador:** `AdminRolesOpcionesController` (@PreAuthorize("hasRole('ADMIN')"))
+    - `GET /api/v1/admin/roles-opciones/roles` — listar todos los roles
+    - `GET /api/v1/admin/roles-opciones/opciones` — listar opciones funcionales
+    - `GET /api/v1/admin/roles-opciones/rol/{idRol}` — obtener opciones de un rol
+    - `POST /api/v1/admin/roles-opciones` — asignar opción a rol
+    - `DELETE /api/v1/admin/roles-opciones/{idRol}/{idOpcion}` — desasignar
+  - **Tests:** `RolesOpcionesServiceTest` (4 tests, @ExtendWith(MockitoExtension.class))
+    - Test 1: `testAsignarOpcionARole_Success` — CA-RXO-02 (IDs existen)
+    - Test 2: `testAsignarOpcionARole_Duplicada` — CA-RXO-01 (validar no duplicar)
+    - Test 3: `testDesasignarOpcionDelRol_Success` — desasignación exitosa
+    - Test 4: `testObtenerOpcionesDelRol_Success` — obtener lista de opciones
+  - **Resultado:** `Tests run: 4, Failures: 0, Errors: 0, Skipped: 0` ✓ BUILD SUCCESS ✓
+
+**Qué se ajustó:**
+- N/A — primera implementación de PASO 1
+
+---
+
+### Prompt 3.10 — CRUDs admin: opciones de inversión, portafolios, preguntas calibración y disclaimers
+**Fecha:** 2026-04-14
+**Herramienta:** Claude Code (claude-sonnet-4-6)
+
+**Qué se pidió:**
+> "Agregemos la funcionalidad de los demás Cruds en el menú de configuración y que son requeridos según el modelo de datos ejemplo: opciones de inversión, portafolios, etc. incluye las validaciones de campos que cumplan con los criterios de aceptación e incluyamos los test, agrega este en los prompts, si resultan nuevas reglas de negocio las incluimos o nuevos criterios también, de esta forma dejemos todos los cruds listos."
+
+> "Entiendo que debe suministrarse un usuario inicial como administrador en las semillas incluyamos como mínimo el usuario martillodebola@gmail.com con ese rol. Considera que aun no estamos configurando a qué tiene acceso el rol de admin para cuando terminemos de montar toda la funcionalidad nos encargaremos de ello, así que por el momento todos los menús están disponibles para todos los usuarios"
+
+**Qué se obtuvo:**
+- **Repositorios nuevos:**
+  - `OpcionInversionRepository.java`: `existsByNombreOpcionAndIdOpcionNot()`, `existsByNombreOpcion()`
+  - `PortafolioInversionRepository.java`: `existsByNombrePortafolioAndIdPortafolioNot()`, `existsByOpcionInversionId()`
+- **Controllers admin (todos `@PreAuthorize("hasRole('ADMIN')")`)**:
+  - `AdminOpcionInversionController.java` — `/api/v1/admin/opciones-inversion`: CRUD completo, validación unicidad de nombre, rentabilidades (mín ≥ 0, máx > 0, mín ≤ máx), eliminación protegida si la opción está en un portafolio
+  - `AdminPortafolioController.java` — `/api/v1/admin/portafolios`: CRUD completo + `PUT /portafolios/{id}/opciones` para asignar/reemplazar opciones de inversión, eliminación protegida si portafolio asignado a perfil, validación de rentabilidades
+  - `AdminPreguntaController.java` — `/api/v1/admin/preguntas-calibracion`: CRUD de preguntas (con `PATCH /{id}/activa`) + CRUD anidado de opciones de respuesta (`/preguntas/{id}/opciones`), validación mínimo 2 opciones por pregunta antes de activar, eliminación de opciones protegida si hay respuestas de encuesta referenciadas
+  - `AdminDisclaimerController.java` — `/api/v1/admin/disclaimers`: CRUD completo + `PATCH /{id}/activo`, no se eliminan (RN-DIS-04), validación de fechas (inicio < fin)
+- **V2__datos_semilla.sql actualizado**:
+  - Nueva opción funcional 6: `GESTIONAR_PARAMETROS`
+  - ADMIN: opciones 1–6 (todas); MAINTAINER: 2,3,4,5; USER: 4,5
+  - Usuario semilla: `martillodebola@gmail.com` con roles ADMIN + USER (`oauth_sub = 'pending-google-martillodebola'` — se vincula al primer login Google por email fallback en `CustomOidcUserService`)
+  - Secuencias actualizadas a valor máximo semilla
+- **CustomOidcUserService.java actualizado**: doble búsqueda oauth_sub → email → crear nuevo; al encontrar por email actualiza `oauth_sub` automáticamente
+- **Tests backend — 19/19 pasando**:
+  - `AdminOpcionInversionControllerTest.java` (5 tests): listar, crear, crear nombre duplicado, actualizar, eliminar con restricción
+  - `AdminPortafolioControllerTest.java` (5 tests): listar, crear, actualizar, asignar opciones, eliminar con restricción
+  - `AdminPreguntaControllerTest.java` (5 tests): listar, crear pregunta, toggle activa, crear opción, eliminar opción con restricción
+  - `AdminDisclaimerControllerTest.java` (4 tests): listar, crear, actualizar, toggle activo
+- **Páginas frontend admin (React Query + useMutation)**:
+  - `/admin/page.tsx` — hub con tarjetas de navegación a cada sección
+  - `/admin/parametros/page.tsx` — tabla editable de parámetros del sistema, formulario de nuevo parámetro
+  - `/admin/opciones-inversion/page.tsx` — tabla con CRUD, validaciones de rentabilidad en frontend
+  - `/admin/portafolios/page.tsx` — tabla con CRUD + modal de asignación de opciones de inversión (checkboxes)
+  - `/admin/preguntas/page.tsx` — lista expandible: cada pregunta despliega sus opciones de respuesta con sub-CRUD inline
+  - `/admin/disclaimers/page.tsx` — lista de disclaimers con vigencia, formulario de creación/edición con datetime-local
+
+**Qué se ajustó:**
+- `AdminPreguntaControllerTest` — test CA-ORC-05 requería `pregunta.setId(1L)` explícito antes del mock para que el verify por ID no fallara
+- Import innecesario de `PortafolioInversionRepository` en `AdminOpcionInversionController` eliminado
+- Navbar: todos los menús visibles para todos los usuarios mientras se completa implementación; TODO comments con referencia a BR-ROL-002 para activar restricción ADMIN cuando corresponda
+
+---

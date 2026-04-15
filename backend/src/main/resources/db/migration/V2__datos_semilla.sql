@@ -33,9 +33,9 @@
 -- 1. ROLES
 -- ============================================================
 INSERT INTO roles_bysone (id_rol, nombre_rol, descripcion_rol) VALUES
-    (1, 'ADMINISTRADOR', 'Acceso total al sistema: gestión de usuarios, perfiles y portafolios'),
-    (2, 'ASESOR',        'Gestión de perfiles y portafolios de inversión'),
-    (3, 'USUARIO',       'Usuario final: realiza simulaciones y encuestas de calibración');
+    (1, 'ADMIN',      'Acceso total al sistema: gestión de usuarios, perfiles y portafolios'),
+    (2, 'MAINTAINER', 'Gestión de perfiles y portafolios de inversión'),
+    (3, 'USER',       'Usuario final: realiza simulaciones y encuestas de calibración');
 
 
 -- ============================================================
@@ -46,18 +46,22 @@ INSERT INTO opciones_funcionales_bysone (id_opcion, nombre_opcion_funcional) VAL
     (2, 'GESTIONAR_PERFILES'),
     (3, 'GESTIONAR_PORTAFOLIOS'),
     (4, 'REALIZAR_SIMULACION'),
-    (5, 'VER_HISTORIAL_SIMULACIONES');
+    (5, 'VER_HISTORIAL_SIMULACIONES'),
+    (6, 'GESTIONAR_PARAMETROS');  -- administración de parámetros del sistema (ADMIN exclusivo)
 
 
 -- ============================================================
 -- 3. PARÁMETROS DEL SISTEMA
 -- ============================================================
 INSERT INTO parametros_bysone (id_parametro, nombre_parametro, valor_parametro) VALUES
-    (1, 'INTERVALO_RECALIBRACION_DIAS',  '180'),
-    (2, 'PUNTAJE_PERFIL_CONSERVADOR_MAX', '2'),
-    (3, 'PUNTAJE_PERFIL_MODERADO_MIN',    '3'),
-    (4, 'PUNTAJE_PERFIL_MODERADO_MAX',    '5'),
-    (5, 'PUNTAJE_PERFIL_AGRESIVO_MIN',    '6');
+    (1, 'INTERVALO_RECALIBRACION_DIAS',          '180'),
+    (2, 'PUNTAJE_PERFIL_CONSERVADOR_MAX',         '2'),
+    (3, 'PUNTAJE_PERFIL_MODERADO_MIN',            '3'),
+    (4, 'PUNTAJE_PERFIL_MODERADO_MAX',            '5'),
+    (5, 'PUNTAJE_PERFIL_AGRESIVO_MIN',            '6'),
+    -- BR-SES-001: Tiempo de inactividad de sesión antes de expirar (en minutos).
+    -- El frontend controla este umbral; al superarlo limpia el token y fuerza nuevo login.
+    (6, 'TIMEOUT_SESION_INACTIVIDAD_MINUTOS',     '5');
 
 
 -- ============================================================
@@ -121,11 +125,21 @@ INSERT INTO disclaimers_bysone (id_disclaimer, titulo, contenido, activo, fecha_
 -- 9. ROLES × OPCIONES FUNCIONALES
 -- ============================================================
 INSERT INTO roles_x_opcion_funcional (id_rol, id_opcion) VALUES
-    (1, 1),   -- ADMINISTRADOR → GESTIONAR_USUARIOS
-    (1, 2),   -- ADMINISTRADOR → GESTIONAR_PERFILES
-    (1, 3),   -- ADMINISTRADOR → GESTIONAR_PORTAFOLIOS
-    (2, 2),   -- ASESOR        → GESTIONAR_PERFILES
-    (3, 4);   -- USUARIO       → REALIZAR_SIMULACION
+    -- ADMIN: acceso total
+    (1, 1),   -- ADMIN → GESTIONAR_USUARIOS
+    (1, 2),   -- ADMIN → GESTIONAR_PERFILES
+    (1, 3),   -- ADMIN → GESTIONAR_PORTAFOLIOS
+    (1, 4),   -- ADMIN → REALIZAR_SIMULACION
+    (1, 5),   -- ADMIN → VER_HISTORIAL_SIMULACIONES
+    (1, 6),   -- ADMIN → GESTIONAR_PARAMETROS (menú Configuración exclusivo)
+    -- MAINTAINER: gestión de productos, sin configuración de sistema
+    (2, 2),   -- MAINTAINER → GESTIONAR_PERFILES
+    (2, 3),   -- MAINTAINER → GESTIONAR_PORTAFOLIOS
+    (2, 4),   -- MAINTAINER → REALIZAR_SIMULACION
+    (2, 5),   -- MAINTAINER → VER_HISTORIAL_SIMULACIONES
+    -- USER: funcionalidades de usuario final
+    (3, 4),   -- USER → REALIZAR_SIMULACION
+    (3, 5);   -- USER → VER_HISTORIAL_SIMULACIONES
 
 
 -- ============================================================
@@ -176,11 +190,26 @@ INSERT INTO preguntas_calibracion (id_pregunta, texto_pregunta, orden, activa) V
 -- 14. OPCIONES DE RESPUESTA DE CALIBRACIÓN
 -- ============================================================
 INSERT INTO opciones_respuesta_calibracion (id_opcion_respuesta, id_pregunta, texto_opcion, puntaje, orden) VALUES
-    (1, 1, 'Proteger mi capital y mantener su poder adquisitivo',                    1, 1),
-    (2, 1, 'Obtener un crecimiento moderado con riesgo controlado',                  2, 2),
-    (3, 1, 'Maximizar el crecimiento aunque implique mayor riesgo y volatilidad',    3, 3),
-    (4, 2, 'Menos de 3 años',                                                        1, 1),
-    (5, 2, 'Entre 3 y 7 años',                                                       2, 2);
+    -- Pregunta 1: Objetivo principal de inversión
+    (1,  1, 'Proteger mi capital y mantener su poder adquisitivo',                    1, 1),
+    (2,  1, 'Obtener un crecimiento moderado con riesgo controlado',                  2, 2),
+    (3,  1, 'Maximizar el crecimiento aunque implique mayor riesgo y volatilidad',    3, 3),
+    -- Pregunta 2: Horizonte de inversión
+    (4,  2, 'Menos de 3 años',                                                        1, 1),
+    (5,  2, 'Entre 3 y 7 años',                                                       2, 2),
+    (6,  2, 'Más de 7 años',                                                          3, 3),
+    -- Pregunta 3: Reacción ante pérdida del 15%
+    (7,  3, 'Retiraría mi dinero inmediatamente para evitar pérdidas mayores',        1, 1),
+    (8,  3, 'Me preocuparía pero esperaría a que el mercado se recupere',             2, 2),
+    (9,  3, 'Lo vería como una oportunidad y consideraría invertir más',              3, 3),
+    -- Pregunta 4: Experiencia previa en inversión
+    (10, 4, 'Ninguna, es la primera vez que invierto',                                1, 1),
+    (11, 4, 'Tengo experiencia básica en CDTs o fondos de bajo riesgo',               2, 2),
+    (12, 4, 'He invertido en acciones, fondos de renta variable o criptoactivos',     3, 3),
+    -- Pregunta 5: Porcentaje de ingresos disponibles para ahorro
+    (13, 5, 'Menos del 5%',                                                           1, 1),
+    (14, 5, 'Entre el 5% y el 15%',                                                  2, 2),
+    (15, 5, 'Más del 15%',                                                            3, 3);
 
 
 -- ============================================================
@@ -189,18 +218,22 @@ INSERT INTO opciones_respuesta_calibracion (id_opcion_respuesta, id_pregunta, te
 INSERT INTO usuarios (id_usuario, nombre_completo_usuario, correo_usuario, celular_usuario, proveedor_oauth, oauth_sub, id_perfil_inversion, fecha_registro, fecha_ultima_actualizacion_perfil_inversion) VALUES
     (1, 'Ana García López',        'ana.garcia@gmail.com',         '3001234567', 'GOOGLE',    'google-sub-ana-001',      2, NOW(), NOW()),
     (2, 'Carlos Martínez Ruiz',    'carlos.martinez@outlook.com',  '3109876543', 'MICROSOFT', 'microsoft-sub-carlos-002', 1, NOW(), NOW()),
-    (3, 'María Rodríguez Pérez',   'maria.rodriguez@gmail.com',    '3205551234', 'GOOGLE',    'google-sub-maria-003',    NULL, NOW(), NULL);
+    (3, 'María Rodríguez Pérez',   'maria.rodriguez@gmail.com',    '3205551234', 'GOOGLE',    'google-sub-maria-003',    NULL, NOW(), NULL),
+    -- Usuario administrador inicial del sistema; oauth_sub se actualiza al primer login con Google
+    (4, 'Martillo de Bola',        'martillodebola@gmail.com',     NULL,         'GOOGLE',    'pending-google-martillodebola', NULL, NOW(), NULL);
 
 
 -- ============================================================
 -- 16. USUARIOS × ROLES
 -- ============================================================
 INSERT INTO usuarios_x_rol (id_usuario, id_rol) VALUES
-    (1, 1),   -- Ana     → ADMINISTRADOR
-    (1, 3),   -- Ana     → USUARIO
-    (2, 2),   -- Carlos  → ASESOR
-    (2, 3),   -- Carlos  → USUARIO
-    (3, 3);   -- María   → USUARIO
+    (1, 1),   -- Ana          → ADMIN
+    (1, 3),   -- Ana          → USER
+    (2, 2),   -- Carlos       → MAINTAINER
+    (2, 3),   -- Carlos       → USER
+    (3, 3),   -- María        → USER
+    (4, 1),   -- Martillodebola → ADMIN
+    (4, 3);   -- Martillodebola → USER
 
 
 -- ============================================================
@@ -269,8 +302,8 @@ INSERT INTO detalle_proyeccion_simulacion (id_detalle, id_simulacion, periodo, v
 -- sin esto el próximo INSERT sin ID generaría conflicto de PK.
 -- ============================================================
 SELECT setval('roles_bysone_id_rol_seq',                                    3);
-SELECT setval('opciones_funcionales_bysone_id_opcion_seq',                  5);
-SELECT setval('parametros_bysone_id_parametro_seq',                         5);
+SELECT setval('opciones_funcionales_bysone_id_opcion_seq',                  6);
+SELECT setval('parametros_bysone_id_parametro_seq',                         6);
 SELECT setval('portafolios_inversion_id_portafolio_inversion_seq',          3);
 SELECT setval('opciones_inversion_id_opcion_inversion_seq',                 5);
 SELECT setval('perfiles_inversion_id_perfil_inversion_seq',                 3);
@@ -278,8 +311,8 @@ SELECT setval('tipos_plazo_id_tipo_plazo_seq',                              4);
 SELECT setval('disclaimers_bysone_id_disclaimer_seq',                       2);
 SELECT setval('formulas_exposicion_id_formula_exposicion_seq',              5);
 SELECT setval('preguntas_calibracion_id_pregunta_seq',                      5);
-SELECT setval('opciones_respuesta_calibracion_id_opcion_respuesta_seq',     5);
-SELECT setval('usuarios_id_usuario_seq',                                     3);
+SELECT setval('opciones_respuesta_calibracion_id_opcion_respuesta_seq',    15);
+SELECT setval('usuarios_id_usuario_seq',                                     4);
 SELECT setval('encuestas_calibracion_id_encuesta_seq',                      3);
 SELECT setval('respuestas_encuesta_calibracion_id_respuesta_seq',           4);
 SELECT setval('simulaciones_bysone_id_simulacion_seq',                      2);

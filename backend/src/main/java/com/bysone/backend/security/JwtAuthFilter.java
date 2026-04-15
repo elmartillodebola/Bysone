@@ -37,8 +37,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        final String jwt      = authHeader.substring(7);
-        final String oauthSub = jwtService.extractUsername(jwt);
+        final String jwt = authHeader.substring(7);
+        final String oauthSub;
+        try {
+            oauthSub = jwtService.extractUsername(jwt);
+        } catch (Exception e) {
+            // Token malformado o firma inválida — continuar sin autenticar (resultará en 401/403)
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         if (oauthSub != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             Usuario usuario = usuarioRepository.findByOauthSub(oauthSub).orElse(null);

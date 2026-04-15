@@ -11,7 +11,7 @@ export default function Header() {
 
   useEffect(() => {
     api.get('/usuarios/me')
-      .then(res => setEmail(res.data.correoUsuario ?? ''))
+      .then(res => setEmail(res.data.correo ?? ''))
       .catch(() => {})
   }, [])
 
