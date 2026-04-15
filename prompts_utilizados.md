@@ -866,3 +866,318 @@ Finalmente: `"vamos adelante"`
 - Navbar: todos los menús visibles para todos los usuarios mientras se completa implementación; TODO comments con referencia a BR-ROL-002 para activar restricción ADMIN cuando corresponda
 
 ---
+
+### Prompt 3.11 — Funcionalidad completa de "Mi Perfil": datos usuario, estado calibración y edición
+**Fecha:** 2026-04-15
+**Herramienta:** Claude Code (claude-sonnet-4-6)
+**Rama:** feature/perfil-usuario
+
+**Qué se pidió:**
+> "adicioneemos la funcionalid del 'Mi Perfil' de tal forma que se muestra la informacion del perfil del usuario de la sesion, su estado si ya hizo la calibracion, sino la ha hecho que indique que la haga y si ya la hizo que muestre sus datos, generemos tambien la opcion de editar los valores, crea los test y ajusta los criterios de aceptacion y las reglas de negocio segun el caso, ademas adiona este prompts y los demas en prompts utilizados"
+
+**Qué se obtuvo:**
+- **Backend — nuevos endpoints en `UsuarioController`**:
+  - `PUT /api/v1/usuarios/me` — edita nombre y celular del usuario autenticado; correo y proveedor OAuth son inmutables
+  - `GET /api/v1/usuarios/me/calibracion` — retorna la última encuesta COMPLETADA (HTTP 200) o HTTP 204 si no existe
+- **Backend — cambios de soporte**:
+  - `ActualizarUsuarioRequest.java` — DTO con validaciones `@NotBlank`, `@Size`, `@Pattern` para nombre y celular
+  - `UltimaEncuestaResponse.java` — nuevo DTO con id, fechaRealizacion, estado, puntajeTotal, perfilAsignado
+  - `UsuarioMeResponse.java` — enriquecido con campo `fechaUltimaActualizacionPerfil`
+  - `EncuestaCalibracionRepository` — nuevo método `findTopByUsuarioAndEstadoOrderByFechaRealizacionDesc`
+  - `UsuarioService` — métodos `actualizarDatos()` y `getUltimaEncuestaCompletada()`
+- **Test backend — `UsuarioServiceTest.java`** (7 casos):
+  - Sin perfil → `requiereRecalibracion = true`
+  - Con perfil reciente → `requiereRecalibracion = false`
+  - Perfil con intervalo no vencido → no requiere recalibrar
+  - Actualiza nombre y celular correctamente
+  - Celular vacío/en blanco se guarda como null (RN-USU-07)
+  - Correo y proveedor no se modifican (RN-USU-07)
+  - Sin encuesta completada → Optional vacío
+  - Con encuesta completada → retorna datos correctos
+- **Frontend — nuevos componentes**:
+  - `DatosUsuarioCard.tsx` — muestra datos personales con edición inline (nombre y celular)
+  - `EstadoCalibracionCard.tsx` — tres estados visuales: "Sin calibrar", "Al día", "Recalibración requerida", con CTA contextual
+- **Frontend — nuevo hook `useUsuario.ts`**:
+  - `useUsuarioMe()` — query para `/usuarios/me`
+  - `useActualizarUsuario()` — mutation `PUT /usuarios/me` con invalidación de caché
+  - `useUltimaCalibracion()` — query para `/usuarios/me/calibracion`, maneja HTTP 204 → null
+- **Frontend — refactorización `perfil/page.tsx`**: 3 secciones: datos personales, estado calibración, perfil de inversión
+- **Test frontend — `DatosUsuarioCard.test.tsx`** (5 casos): lectura, celular no registrado, modo edición, nombre vacío, cancelar
+- **Test frontend — `EstadoCalibracionCard.test.tsx`** (4 casos): sin calibrar, al día, vencido, nombre perfil
+- **Docs actualizados**:
+  - `Reglas_Negocio.md` — RN-USU-06 (campos editables) y RN-USU-07 (celular opcional, nombre obligatorio)
+  - `Criterios_Aceptacion.md` — CA-USU-12 a CA-USU-16 (edición, validaciones, endpoint calibración, estados visuales)
+
+**Qué se ajustó:**
+- Import innecesario `HttpStatus` / `ResponseStatusException` eliminado de `UsuarioService` por warning del IDE
+- Tests frontend usan `jest.mock('@/hooks/useUsuario')` para aislar la mutación sin necesidad de QueryClientProvider
+
+### Prompt 3.12 — Consulta de usuarios en menú Configuración (solo lectura)
+**Fecha:** 2026-04-14
+**Herramienta:** Claude Code (claude-sonnet-4-6)
+
+**Qué se pidió:**
+> "crea la funcionalidad en el menu configuracion para consultar los usuarios, no permitas la opción de crear o modificar sería solo de consulta"
+
+**Qué se obtuvo:**
+- **Backend — `UsuarioAdminResponse.java`**: nuevo DTO record con los mismos campos que `UsuarioMeResponse` (id, nombreCompleto, correo, celular, proveedorOauth, fechaRegistro, fechaUltimaActualizacionPerfil, roles, perfilInversion, requiereRecalibracion)
+- **Backend — `AdminUsuariosController.java`**: controlador `@PreAuthorize("hasRole('ADMIN')")` con dos endpoints de solo lectura:
+  - `GET /api/v1/admin/usuarios` — lista todos los usuarios con cálculo de `requiereRecalibracion`
+  - `GET /api/v1/admin/usuarios/{id}` — detalle individual
+- **Frontend — `admin/usuarios/page.tsx`**: tabla con búsqueda (nombre, correo o perfil), columnas: nombre, correo, proveedor (badge de color), perfil asignado (badge), roles, estado calibración. Modal "Ver más" con detalle completo; sin botones de crear/editar/eliminar en ninguna parte
+- **Frontend — `admin/page.tsx`**: nueva tarjeta "Usuarios registrados" como primera opción en el hub de Configuración
+
+**Qué se ajustó:**
+- Import innecesario `ParametroBysone` removido de `AdminUsuariosController`
+- La lógica de cálculo de `requiereRecalibracion` se replica en el controller inline (no se extrae a servicio) para mantener la consulta de solo lectura sin dependencia adicional
+
+**Archivos afectados:**
+- `backend/src/main/java/com/bysone/backend/dto/response/UsuarioAdminResponse.java` (nuevo)
+- `backend/src/main/java/com/bysone/backend/controller/AdminUsuariosController.java` (nuevo)
+- `frontend/src/app/(dashboard)/admin/usuarios/page.tsx` (nuevo)
+- `frontend/src/app/(dashboard)/admin/page.tsx` (modificado)
+
+### Prompt 3.13 — CRUD y configuración de perfiles de inversión
+**Fecha:** 2026-04-15
+**Herramienta:** Claude Code (claude-sonnet-4-6)
+
+**Qué se pidió:**
+> "ahora adiciona en configuracion la funcionalidad del crud y configuracion de los perfiles de inversion, considerar que los perfiles se pueden agregar nuevos perfiles a los existentes y que se puedan configurar sus composiciones"
+
+**Qué se obtuvo:**
+- **Backend — repositorios nuevos**:
+  - `PerfilPortafolioRepository.java` — con `deleteByPerfilId` (JPQL `@Modifying`)
+  - `FormulaExposicionRepository.java` — con `deleteByPerfilId` (JPQL `@Modifying`)
+- **Backend — repositorios extendidos**:
+  - `PerfilInversionRepository` — añadido `findWithAllById` (fetch join de portafolios + fórmulas) y `existsByNombrePerfilIgnoreCase`
+  - `UsuarioRepository` — añadido `existsByPerfilInversionId` para verificar usuarios asignados antes de eliminar
+- **Backend — `AdminPerfilService.java`** (nuevo): lógica de negocio completa
+  - `listar()`, `obtener(id)`
+  - `crear(nombre)` — valida nombre único, crea perfil vacío
+  - `renombrar(id, nombre)` — valida unicidad excluyendo el propio perfil (case-insensitive)
+  - `eliminar(id)` — bloquea si hay usuarios asignados; elimina fórmulas y composición antes del perfil
+  - `actualizarComposicion(id, items)` — valida suma = 100%, reemplaza todo en transacción
+  - `actualizarFormulas(id, items)` — valida umbralMin ≤ umbralMax, reemplaza todo en transacción
+- **Backend — `AdminPerfilController.java`** (nuevo): `@PreAuthorize("hasRole('ADMIN')")`
+  - `GET /api/v1/admin/perfiles`
+  - `GET /api/v1/admin/perfiles/{id}`
+  - `POST /api/v1/admin/perfiles` → HTTP 201
+  - `PUT /api/v1/admin/perfiles/{id}`
+  - `DELETE /api/v1/admin/perfiles/{id}` → HTTP 204
+  - `PUT /api/v1/admin/perfiles/{id}/composicion`
+  - `PUT /api/v1/admin/perfiles/{id}/formulas`
+- **Test backend — `AdminPerfilServiceTest.java`** (10 casos):
+  - crear nombre único → crea correctamente
+  - crear nombre duplicado → CONFLICT 409
+  - crear nombre en blanco → BAD_REQUEST 400
+  - renombrar mismo nombre (case-insensitive) → no lanza excepción
+  - renombrar perfil inexistente → NOT_FOUND 404
+  - eliminar sin usuarios → elimina correctamente (fórmulas + composición + perfil)
+  - eliminar con usuarios asignados → CONFLICT 409
+  - eliminar perfil inexistente → NOT_FOUND 404
+  - actualizarComposicion suma 100 → guarda correctamente
+  - actualizarComposicion no suma 100 → UNPROCESSABLE_ENTITY 422
+  - actualizarComposicion portafolio inexistente → UNPROCESSABLE_ENTITY 422
+- **Frontend — `admin/perfiles/page.tsx`** (nuevo):
+  - Tabla: nombre, rentabilidades ponderadas (min/media/max), nº portafolios asignados
+  - Botón "Nuevo perfil" → modal crear (solo nombre)
+  - Por fila: Editar (renombra), Composición (panel modal con checkboxes + % por portafolio + indicador suma), Fórmulas (panel modal con checkboxes + umbral min/max), Eliminar
+  - Indicador visual de suma total en panel de composición (verde si = 100%, ámbar si no)
+- **Frontend — `admin/page.tsx`**: tarjeta "Perfiles de inversión" añadida al hub de Configuración
+
+**Qué se ajustó:**
+- `PerfilInversion` ya tenía `cascade = CascadeType.ALL` en colecciones, pero sin `orphanRemoval`, por lo que la estrategia de reemplazo usa repositorios directos con `deleteByPerfilId` + save de nuevas entidades, más predecible en transacciones con JPA
+- La validación de nombre único en renombrar excluye el nombre actual del propio perfil para permitir guardar sin cambios o con cambio de case
+
+**Archivos afectados:**
+- `backend/.../repository/PerfilPortafolioRepository.java` (nuevo)
+- `backend/.../repository/FormulaExposicionRepository.java` (nuevo)
+- `backend/.../repository/PerfilInversionRepository.java` (modificado)
+- `backend/.../repository/UsuarioRepository.java` (modificado)
+- `backend/.../service/AdminPerfilService.java` (nuevo)
+- `backend/.../controller/AdminPerfilController.java` (nuevo)
+- `backend/.../test/.../service/AdminPerfilServiceTest.java` (nuevo)
+- `frontend/src/app/(dashboard)/admin/perfiles/page.tsx` (nuevo)
+- `frontend/src/app/(dashboard)/admin/page.tsx` (modificado)
+- `docs/Criterios_Aceptacion.md` — CA-PER-04 a CA-PER-09 añadidos
+- `docs/Reglas_Negocio.md` — RN-PER-01 actualizado; RN-PER-05, RN-PER-06, RN-PER-07 añadidos
+
+---
+
+### Prompt 3.14 — CRUD de Tipos de Plazo (catálogo unidades de tiempo para simulaciones)
+
+**Prompt literal enviado:**
+> "quiero que vayas paso a paso en cada punto de forma autonoma: segun los Pendientes de Configuración y UX (lista completa actualizada), recuerda en cada punto adicionar los test, ajustar donde sea necesario reglas de negocio, criterios de aceptacion y prompts utilizados. [P-01: Tipos de plazo]"
+
+**Objetivo:** Implementar CRUD completo del catálogo `tipos_plazo` desde el menú de Configuración Bysone, con bloqueo de eliminación si hay simulaciones asociadas.
+
+**Qué se implementó:**
+- **Backend — `TipoPlazoRepository`**: añadidos `existsByNombrePlazoIgnoreCase` y `existsByNombrePlazoIgnoreCaseAndIdNot` para validación de unicidad
+- **Backend — `SimulacionRepository`**: añadido `existsByTipoPlazoId` para bloquear eliminaciones en uso
+- **Backend — `AdminTipoPlazoController`** (nuevo): CRUD completo `/api/v1/admin/tipos-plazo` con `@PreAuthorize("hasRole('ADMIN')")`. Reglas: nombre único case-insensitive (409), factor ≥ 1, bloqueo eliminación si en uso (409)
+- **Tests — `AdminTipoPlazoControllerTest`** (nuevo): 8 tests con Mockito — crear válido, nombre duplicado, 404 actualizar inexistente, actualizar correcto, nombre colisión en actualización, 404 eliminar inexistente, bloqueo eliminación con simulaciones, eliminar correcto
+- **Frontend — `admin/tipos-plazo/page.tsx`** (nuevo): tabla + formulario inline; validación frontend; botón Cancelar que regresa a `/admin`
+- **Frontend — `admin/page.tsx`**: tarjeta "Tipos de plazo" añadida al hub de Configuración
+
+**Archivos afectados:**
+- `backend/.../repository/TipoPlazoRepository.java` (modificado)
+- `backend/.../repository/SimulacionRepository.java` (modificado)
+- `backend/.../controller/AdminTipoPlazoController.java` (nuevo)
+- `backend/.../test/.../controller/AdminTipoPlazoControllerTest.java` (nuevo)
+- `frontend/src/app/(dashboard)/admin/tipos-plazo/page.tsx` (nuevo)
+- `frontend/src/app/(dashboard)/admin/page.tsx` (modificado)
+- `docs/Criterios_Aceptacion.md` — CA-TPL-01 a CA-TPL-05 añadidos
+- `docs/Reglas_Negocio.md` — RN-TPL-01 a RN-TPL-04 añadidos (sección 9)
+
+---
+
+### Prompt 3.15 — Pantalla Roles × Opciones funcionales (frontend)
+
+**Prompt literal enviado:**
+> "quiero que vayas paso a paso en cada punto de forma autonoma: [...] [P-02: Roles × Opciones]"
+
+**Objetivo:** Crear la pantalla frontend que consume el `AdminRolesOpcionesController` ya existente para gestionar visualmente qué opciones funcionales tiene asignadas cada rol.
+
+**Qué se implementó:**
+- **Frontend — `admin/roles-opciones/page.tsx`** (nuevo): matriz roles × opciones con checkboxes; al marcar/desmarcar llama a POST/DELETE del backend. Carga asignaciones actuales de cada rol al montar. Botón Cancelar regresa a `/admin`
+- **Frontend — `admin/page.tsx`**: tarjeta "Roles × Opciones funcionales" añadida al hub de Configuración
+- **Tests — `src/__tests__/rolesOpciones.test.ts`** (nuevo): 5 tests Jest que validan la lógica del Set de asignaciones (clave "idRol-idOpcion", sin colisiones, múltiples opciones por rol)
+
+**Archivos afectados:**
+- `frontend/src/app/(dashboard)/admin/roles-opciones/page.tsx` (nuevo)
+- `frontend/src/app/(dashboard)/admin/page.tsx` (modificado)
+- `frontend/src/__tests__/rolesOpciones.test.ts` (nuevo)
+
+---
+
+### Prompt 3.16 — Validación de fórmulas de exposición al guardar composición (soft-block)
+
+**Prompt literal enviado:**
+> "quiero que vayas paso a paso en cada punto de forma autonoma: [...] [P-03: Validación fórmulas de exposición al guardar composición]"
+
+**Objetivo:** Implementar la validación soft-block en el backend: al guardar la composición de un perfil, si existe una fórmula de exposición para un par perfil-portafolio, el porcentaje asignado debe estar dentro del rango [umbralMin, umbralMax]. Solo bloquea si la fórmula existe; si no hay fórmula, no aplica restricción.
+
+**Qué se implementó:**
+- **Backend — `FormulaExposicionRepository`**: añadido `findByPerfilIdAndPortafolioId` para consultar la fórmula de un par específico
+- **Backend — `AdminPerfilService.actualizarComposicion`**: validación previa al replace-all que itera los ítems y verifica contra la fórmula existente (si la hay). Responde HTTP 422 con mensaje descriptivo que incluye el rango permitido
+- **Tests — `AdminPerfilServiceTest`**: 4 nuevos tests de fórmulas de exposición (15 tests en total): porcentaje dentro del umbral, porcentaje bajo el umbral mínimo, porcentaje sobre el umbral máximo, sin fórmula definida no aplica restricción
+- **Frontend — `perfiles/page.tsx`**: sin cambios estructurales — el `onError` de `mutComposicion` ya propaga el mensaje 422 del backend al estado `error` visible en el modal
+
+**Archivos afectados:**
+- `backend/.../repository/FormulaExposicionRepository.java` (modificado)
+- `backend/.../service/AdminPerfilService.java` (modificado)
+- `backend/.../test/.../service/AdminPerfilServiceTest.java` (modificado — 4 tests añadidos)
+- `docs/Reglas_Negocio.md` — RN-PER-04 ya existente cubre la regla; sin cambios adicionales
+
+---
+
+### Prompt 3.17 — Botón Cancelar en todas las secciones de Configuración
+
+**Prompt literal enviado:**
+> "quiero que vayas paso a paso en cada punto de forma autonoma: [...] [P-04: Botón Cancelar en todas las páginas admin]"
+
+**Objetivo:** Agregar un botón "Cancelar" en cada sección del menú de Configuración que, al pulsarse, navega de regreso a `/admin`.
+
+**Qué se implementó:**
+- `useRouter` de `next/navigation` importado en todas las páginas admin que no lo tenían
+- Botón "Cancelar" (variant outline) en el header de cada página, alineado a la derecha mediante `flex items-center justify-between`
+- Páginas modificadas: `preguntas`, `opciones-inversion`, `portafolios`, `disclaimers`, `parametros`, `usuarios`, `perfiles` (las páginas `tipos-plazo` y `roles-opciones` ya lo incluían desde su creación)
+
+**Archivos afectados:**
+- `frontend/src/app/(dashboard)/admin/preguntas/page.tsx` (modificado)
+- `frontend/src/app/(dashboard)/admin/opciones-inversion/page.tsx` (modificado)
+- `frontend/src/app/(dashboard)/admin/portafolios/page.tsx` (modificado)
+- `frontend/src/app/(dashboard)/admin/disclaimers/page.tsx` (modificado)
+- `frontend/src/app/(dashboard)/admin/parametros/page.tsx` (modificado)
+- `frontend/src/app/(dashboard)/admin/usuarios/page.tsx` (modificado)
+- `frontend/src/app/(dashboard)/admin/perfiles/page.tsx` (modificado)
+
+---
+
+### Prompt 3.18 — Revisión UX captura de datos en Configuración
+
+**Prompt literal enviado:**
+> "quiero que vayas paso a paso en cada punto de forma autonoma: [...] [P-05: Revisión UX captura de datos]"
+
+**Objetivo:** Revisar todas las páginas del menú Configuración y corregir inconsistencias UX: validaciones frontend, mensajes de error, campos obligatorios marcados y experiencia consistente entre secciones.
+
+**Qué se implementó:**
+- **Parámetros** — validación frontend que bloquea guardar si `valorEdit` está vacío; mensaje de error visible cerca de la tabla
+- **Portafolios** — `disabled` en botón Eliminar mientras la mutación está en curso
+- **Disclaimers** — error movido al interior del formulario (antes aparecía al tope de la página); `required` en inputs obligatorios; `placeholder` descriptivo en Título y Contenido; etiqueta "opcional" en italic para fecha de fin
+- **TypeScript** — verificado sin errores de compilación en todas las páginas modificadas
+
+**Archivos afectados:**
+- `frontend/src/app/(dashboard)/admin/parametros/page.tsx` (modificado)
+- `frontend/src/app/(dashboard)/admin/portafolios/page.tsx` (modificado)
+- `frontend/src/app/(dashboard)/admin/disclaimers/page.tsx` (modificado)
+
+---
+
+### Prompt 3.19 — Verificación gráfica de proyección en Simulaciones
+
+**Prompt literal enviado:**
+> "quiero que vayas paso a paso en cada punto de forma autonoma: [...] [P-06: Gráfica de proyección en Simulaciones]"
+
+**Resultado de la revisión:** La gráfica de proyección ya estaba implementada en sesiones anteriores.
+
+**Estado de la funcionalidad:**
+- `frontend/src/components/simulacion/GraficaProyeccion.tsx` — componente completo con Recharts (AreaChart): 3 curvas (Mínimo/Esperado/Máximo), eje X por período, eje Y formateado como moneda, tarjeta de resumen con `gananciaEsperada` y `rendimientoPorcentualTotal`
+- `frontend/src/app/(dashboard)/simulacion/page.tsx` — importa y usa `GraficaProyeccion` correctamente, condicionado a que `resultado` no sea null
+- `frontend/src/hooks/useSimulacion.ts` — hook que gestiona estado del resultado en memoria hasta confirmación
+- `frontend/src/lib/types.ts` — tipos `PeriodoProyeccion` y `ResumenSimulacion` definidos correctamente
+
+**Acción tomada:** Ningún cambio de código necesario. P-06 marcado como completado.
+
+---
+
+### Prompt 3.20 — CRUD de Roles
+
+**Prompt literal enviado:**
+> "quiero que vayas paso a paso en cada punto de forma autonoma: [...] [P-07: CRUD de Roles]"
+
+**Objetivo:** Implementar el CRUD completo del catálogo de roles del sistema con bloqueo de eliminación si hay usuarios asignados.
+
+**Qué se implementó:**
+- **Backend — `RoleRepository`**: añadidos `existsByNombreRolIgnoreCase` y `existsByNombreRolIgnoreCaseAndIdNot`
+- **Backend — `UsuarioRepository`**: añadido `existsByRolesId` para verificar uso del rol
+- **Backend — `AdminRolController`** (nuevo): CRUD completo `/api/v1/admin/roles` con `@PreAuthorize("hasRole('ADMIN')")`. Nombre normalizado a MAYÚSCULAS, único case-insensitive (409), bloqueo eliminación con usuarios (409)
+- **Tests — `AdminRolControllerTest`** (nuevo): 8 tests — crear único, nombre duplicado 409, 404 actualizar inexistente, actualizar correcto, colisión nombre 409, 404 eliminar inexistente, bloqueo con usuarios 409, eliminar correcto
+- **Frontend — `admin/roles/page.tsx`** (nuevo): tabla + formulario; nombre auto-MAYÚSCULAS; botón Cancelar; `disabled` en Eliminar mientras pending
+- **Frontend — `admin/page.tsx`**: tarjeta "Roles" añadida al hub de Configuración
+- **Docs** — RN-ROL-01 a RN-ROL-03 y CA-ROL-01 a CA-ROL-04 añadidos
+
+**Archivos afectados:**
+- `backend/.../repository/RoleRepository.java` (modificado)
+- `backend/.../repository/UsuarioRepository.java` (modificado)
+- `backend/.../controller/AdminRolController.java` (nuevo)
+- `backend/.../test/.../controller/AdminRolControllerTest.java` (nuevo)
+- `frontend/src/app/(dashboard)/admin/roles/page.tsx` (nuevo)
+- `frontend/src/app/(dashboard)/admin/page.tsx` (modificado)
+- `docs/Reglas_Negocio.md` — sección 10 (Roles) añadida
+- `docs/Criterios_Aceptacion.md` — CA-ROL-01 a CA-ROL-04 añadidos
+
+---
+
+### Prompt 3.21 — CRUD de Opciones Funcionales
+
+**Prompt literal enviado:**
+> "quiero que vayas paso a paso en cada punto de forma autonoma: [...] [P-08: CRUD de Opciones funcionales]"
+
+**Objetivo:** Implementar el CRUD completo del catálogo de opciones funcionales con bloqueo de eliminación si está asignada a roles.
+
+**Qué se implementó:**
+- **Backend — `OpcionFuncionalRepository`**: añadidos `existsByNombreOpcionFuncionalIgnoreCase` y `existsByNombreOpcionFuncionalIgnoreCaseAndIdNot`
+- **Backend — `AdminOpcionFuncionalController`** (nuevo): CRUD `/api/v1/admin/opciones-funcionales` con `@PreAuthorize("hasRole('ADMIN')")`. Nombre auto-MAYÚSCULAS, único case-insensitive (409), bloqueo eliminación con roles asignados (409)
+- **Tests — `AdminOpcionFuncionalControllerTest`** (nuevo): 8 tests — crear única, nombre duplicado 409, 404 actualizar inexistente, actualizar correcto, colisión 409, 404 eliminar inexistente, bloqueo con roles 409, eliminar correcto
+- **Frontend — `admin/opciones-funcionales/page.tsx`** (nuevo): tabla + formulario; nombre auto-MAYÚSCULAS; botón Cancelar; `disabled` en Eliminar
+- **Frontend — `admin/page.tsx`**: tarjeta "Opciones funcionales" añadida
+- **Docs** — CA-OPF-01 a CA-OPF-04 añadidos
+
+**Archivos afectados:**
+- `backend/.../repository/OpcionFuncionalRepository.java` (modificado)
+- `backend/.../controller/AdminOpcionFuncionalController.java` (nuevo)
+- `backend/.../test/.../controller/AdminOpcionFuncionalControllerTest.java` (nuevo)
+- `frontend/src/app/(dashboard)/admin/opciones-funcionales/page.tsx` (nuevo)
+- `frontend/src/app/(dashboard)/admin/page.tsx` (modificado)
+- `docs/Criterios_Aceptacion.md` — CA-OPF-01 a CA-OPF-04 añadidos

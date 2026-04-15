@@ -12,6 +12,11 @@ spring:
             client-id: 958427260634-ap70c0ddc00s0r5o3dqjdo079bktj99h.apps.googleusercontent.com
             client-secret: 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
 
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+
 bysone:
   frontend-url: http://localhost:3000
   jwt:

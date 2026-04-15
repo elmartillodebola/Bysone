@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import Spinner from '@/components/shared/Spinner'
@@ -15,6 +16,7 @@ const empty = { nombre: '', descripcion: '', rentabilidadMinima: '', rentabilida
 
 export default function OpcionesInversionPage() {
   const queryClient = useQueryClient()
+  const router = useRouter()
   const [form, setForm] = useState(empty)
   const [editandoId, setEditandoId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -70,7 +72,10 @@ export default function OpcionesInversionPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="text-xl font-bold">Opciones de inversión</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">Opciones de inversión</h1>
+        <Button variant="outline" onClick={() => router.push('/admin')}>Cancelar</Button>
+      </div>
 
       <div className="border rounded-lg overflow-hidden">
         <table className="w-full text-sm">

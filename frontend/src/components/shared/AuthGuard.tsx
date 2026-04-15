@@ -16,9 +16,9 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const token = localStorage.getItem('bysone_token')
     if (!token) {
       router.replace('/login')
-    } else {
-      setChecking(false)
+      return
     }
+    setChecking(false)
   }, [router])
 
   if (checking) {

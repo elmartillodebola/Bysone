@@ -2,7 +2,7 @@ package com.bysone.backend.dto.response;
 
 import java.util.List;
 
-public record UsuarioMeResponse(
+public record UsuarioAdminResponse(
         Long id,
         String nombreCompleto,
         String correo,

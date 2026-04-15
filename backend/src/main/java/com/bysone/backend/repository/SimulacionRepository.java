@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface SimulacionRepository extends JpaRepository<Simulacion, Long> {
     Page<Simulacion> findByUsuarioId(Long idUsuario, Pageable pageable);
     Optional<Simulacion> findByIdAndUsuarioId(Long id, Long idUsuario);
+    boolean existsByTipoPlazoId(Long tipoPlazoId);
 }

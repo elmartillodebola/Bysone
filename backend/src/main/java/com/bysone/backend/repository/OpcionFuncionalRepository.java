@@ -9,4 +9,6 @@ import java.util.Optional;
 @Repository
 public interface OpcionFuncionalRepository extends JpaRepository<OpcionFuncional, Long> {
     Optional<OpcionFuncional> findByNombreOpcionFuncional(String nombre);
+    boolean existsByNombreOpcionFuncionalIgnoreCase(String nombre);
+    boolean existsByNombreOpcionFuncionalIgnoreCaseAndIdNot(String nombre, Long id);
 }

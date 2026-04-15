@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import Spinner from '@/components/shared/Spinner'
@@ -15,6 +16,7 @@ const empty = { titulo: '', contenido: '', fechaVigenciaDesde: '', fechaVigencia
 
 export default function DisclaimersPage() {
   const queryClient = useQueryClient()
+  const router = useRouter()
   const [form, setForm] = useState(empty)
   const [editandoId, setEditandoId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -70,9 +72,11 @@ export default function DisclaimersPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="text-xl font-bold">Disclaimers legales</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">Disclaimers legales</h1>
+        <Button variant="outline" onClick={() => router.push('/admin')}>Cancelar</Button>
+      </div>
       <p className="text-xs text-muted-foreground">RN-DIS-04: los disclaimers no se eliminan, solo se desactivan.</p>
-      {error && <p className="text-destructive text-sm bg-destructive/10 px-3 py-2 rounded">{error}</p>}
 
       <div className="space-y-3">
         {disclaimers.map(d => (
@@ -104,23 +108,48 @@ export default function DisclaimersPage() {
 
       <div className="border rounded-lg p-5 space-y-3 bg-card">
         <h2 className="font-semibold text-sm">{editandoId ? 'Editar disclaimer' : 'Nuevo disclaimer'}</h2>
+        {error && <p className="text-destructive text-sm bg-destructive/10 px-3 py-2 rounded">{error}</p>}
         <div className="space-y-3">
           <div>
             <label className="text-xs text-muted-foreground">Título *</label>
-            <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm mt-1" />
+            <input
+              required
+              value={form.titulo}
+              onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))}
+              className="w-full border rounded px-3 py-2 text-sm mt-1"
+              placeholder="Ej: Aviso legal de inversiones"
+            />
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Contenido *</label>
-            <textarea rows={5} value={form.contenido} onChange={e => setForm(f => ({ ...f, contenido: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm mt-1 resize-none" />
+            <textarea
+              required
+              rows={5}
+              value={form.contenido}
+              onChange={e => setForm(f => ({ ...f, contenido: e.target.value }))}
+              className="w-full border rounded px-3 py-2 text-sm mt-1 resize-none"
+              placeholder="Texto completo del disclaimer legal…"
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-muted-foreground">Inicio de vigencia *</label>
-              <input type="datetime-local" value={form.fechaVigenciaDesde} onChange={e => setForm(f => ({ ...f, fechaVigenciaDesde: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm mt-1" />
+              <input
+                required
+                type="datetime-local"
+                value={form.fechaVigenciaDesde}
+                onChange={e => setForm(f => ({ ...f, fechaVigenciaDesde: e.target.value }))}
+                className="w-full border rounded px-3 py-2 text-sm mt-1"
+              />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Fin de vigencia (opcional)</label>
-              <input type="datetime-local" value={form.fechaVigenciaHasta} onChange={e => setForm(f => ({ ...f, fechaVigenciaHasta: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm mt-1" />
+              <label className="text-xs text-muted-foreground">Fin de vigencia <span className="italic">(opcional)</span></label>
+              <input
+                type="datetime-local"
+                value={form.fechaVigenciaHasta}
+                onChange={e => setForm(f => ({ ...f, fechaVigenciaHasta: e.target.value }))}
+                className="w-full border rounded px-3 py-2 text-sm mt-1"
+              />
             </div>
           </div>
         </div>

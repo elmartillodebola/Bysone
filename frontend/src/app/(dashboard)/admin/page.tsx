@@ -4,6 +4,16 @@ import Link from 'next/link'
 
 const secciones = [
   {
+    href: '/admin/usuarios',
+    titulo: 'Usuarios registrados',
+    descripcion: 'Consulta de usuarios: perfil asignado, estado de calibración y roles.',
+  },
+  {
+    href: '/admin/perfiles',
+    titulo: 'Perfiles de inversión',
+    descripcion: 'Crear y configurar perfiles con su composición de portafolios y fórmulas de exposición.',
+  },
+  {
     href: '/admin/parametros',
     titulo: 'Parámetros del sistema',
     descripcion: 'Timeouts, intervalos de recalibración y umbrales de puntaje.',
@@ -27,6 +37,26 @@ const secciones = [
     href: '/admin/disclaimers',
     titulo: 'Disclaimers legales',
     descripcion: 'Textos legales con gestión de vigencia.',
+  },
+  {
+    href: '/admin/tipos-plazo',
+    titulo: 'Tipos de plazo',
+    descripcion: 'Catálogo de unidades de tiempo para simulaciones (Días, Meses, Trimestres, Años).',
+  },
+  {
+    href: '/admin/roles-opciones',
+    titulo: 'Roles × Opciones funcionales',
+    descripcion: 'Asignación de opciones funcionales a cada rol del sistema.',
+  },
+  {
+    href: '/admin/roles',
+    titulo: 'Roles',
+    descripcion: 'Crear y renombrar roles del sistema (ADMIN, USER, MAINTAINER…).',
+  },
+  {
+    href: '/admin/opciones-funcionales',
+    titulo: 'Opciones funcionales',
+    descripcion: 'Catálogo de permisos del sistema (GESTIONAR_USUARIOS, REALIZAR_SIMULACION…).',
   },
 ]
 

@@ -118,8 +118,14 @@ Aplican a todas las tablas del modelo.
 | ID | Criterio | Responsable |
 |----|----------|-------------|
 | CA-PER-01 | `nombre_perfil_inversion` no puede estar vacío ni superar 100 caracteres. | `[BD/APP]` |
-| CA-PER-02 | `nombre_perfil_inversion` debe ser único en el sistema. | `[APP]` |
+| CA-PER-02 | `nombre_perfil_inversion` debe ser único en el sistema (validación case-insensitive). | `[APP]` |
 | CA-PER-03 | La `rentabilidadMinima` del perfil es la suma ponderada de `rentabilidadCalculadaVariableMinimo` de cada portafolio por su `porcentaje / 100`. La `rentabilidadMaxima` se calcula análogamente con `rentabilidadCalculadaVariableMaximo`. La `rentabilidadMedia` es `(rentabilidadMinima + rentabilidadMaxima) / 2`. Estos campos son calculados por el backend al servir `GET /api/v1/perfiles`. | `[APP]` |
+| CA-PER-04 | `POST /api/v1/admin/perfiles` crea un perfil vacío (sin composición). Solo `nombre` es requerido. Responde HTTP 201. | `[APP]` |
+| CA-PER-05 | `PUT /api/v1/admin/perfiles/{id}` actualiza el nombre del perfil. Devuelve HTTP 409 si el nuevo nombre ya existe en otro perfil (comparación case-insensitive). | `[APP]` |
+| CA-PER-06 | `DELETE /api/v1/admin/perfiles/{id}` elimina el perfil solo si ningún usuario lo tiene asignado. Si hay usuarios asignados devuelve HTTP 409. | `[APP]` |
+| CA-PER-07 | `PUT /api/v1/admin/perfiles/{id}/composicion` reemplaza completamente los portafolios asignados al perfil con sus porcentajes. La suma de porcentajes debe ser exactamente 100.00; de lo contrario devuelve HTTP 422. | `[APP]` |
+| CA-PER-08 | `PUT /api/v1/admin/perfiles/{id}/formulas` reemplaza completamente las fórmulas de exposición del perfil. Para cada ítem, `umbralMin` ≤ `umbralMax`; de lo contrario devuelve HTTP 422. | `[APP]` |
+| CA-PER-09 | Todos los endpoints `admin/perfiles/**` requieren rol `ADMIN`; sin él devuelven HTTP 403. | `[APP]` |
 
 ### perfiles_inversion_x_portafolios_inversion
 
@@ -156,6 +162,15 @@ Aplican a todas las tablas del modelo.
 | CA-USU-09 | Si `id_perfil_inversion` es nulo, `fecha_ultima_actualizacion_perfil_inversion` también debe ser nula. | `[APP]` |
 | CA-USU-10 | Al asignar o cambiar el perfil de inversión, se debe actualizar simultáneamente `fecha_ultima_actualizacion_perfil_inversion` con la fecha y hora actuales. | `[APP]` |
 | CA-USU-11 | `requiereRecalibracion` es `true` cuando `fechaUltimaActualizacionPerfilInversion` es nula o cuando la diferencia entre la fecha actual del servidor y dicho campo supera el valor del parámetro `INTERVALO_RECALIBRACION_DIAS`. | `[APP]` |
+| CA-USU-12 | `PUT /api/v1/usuarios/me` acepta únicamente `nombreCompleto` (obligatorio, máx 200 chars) y `celular` (opcional). El campo `correo` no es editable y se ignora si se envía. | `[APP]` |
+| CA-USU-13 | `nombreCompleto` en la edición no puede estar vacío ni ser solo espacios. El backend responde con HTTP 400 y detalle de validación si se envía vacío. | `[APP]` |
+| CA-USU-14 | `celular`, si se envía, debe tener entre 7 y 20 caracteres y solo puede contener dígitos, espacios, guiones y `+`. Si se envía vacío o en blanco, se guarda como `NULL`. | `[APP]` |
+| CA-USU-15 | `GET /api/v1/usuarios/me/calibracion` retorna HTTP 200 con la última encuesta `COMPLETADA` del usuario, o HTTP 204 si no existe ninguna. | `[APP]` |
+| CA-USU-16 | La página "Mi Perfil" muestra el estado de calibración con tres estados visuales: "Sin calibrar" (nunca completada), "Al día" (completada y vigente), "Recalibración requerida" (completada pero vencida). | `[APP]` |
+| CA-USU-17 | `GET /api/v1/admin/usuarios` requiere rol `ADMIN`. Un usuario sin ese rol recibe HTTP 403. | `[APP]` |
+| CA-USU-18 | La vista de administración de usuarios es de solo lectura: no expone ni muestra acciones de crear, editar ni eliminar usuarios. | `[APP]` |
+| CA-USU-19 | La lista de usuarios incluye para cada uno: nombre completo, correo, proveedor OAuth, perfil asignado (o "Sin calibrar"), roles y estado de calibración (`requiereRecalibracion`). | `[APP]` |
+| CA-USU-20 | La búsqueda en la lista de usuarios filtra por nombre completo, correo y nombre del perfil de inversión, sin distinguir mayúsculas/minúsculas. | `[APP]` |
 
 ---
 
@@ -263,4 +278,38 @@ Aplican a todas las tablas del modelo.
 
 ---
 
-> Documento generado el 2026-04-13. Debe revisarse y actualizarse cuando cambien el modelo de datos o las reglas de negocio.
+### tipos_plazo
+
+| ID | Criterio | Responsable |
+|----|----------|-------------|
+| CA-TPL-01 | El nombre del tipo de plazo es obligatorio y no puede superar 50 caracteres. | `[APP]` |
+| CA-TPL-02 | No pueden existir dos tipos de plazo con el mismo nombre (sin distinguir mayúsculas/minúsculas). Intentar crear o renombrar con nombre duplicado retorna HTTP 409. | `[APP]` |
+| CA-TPL-03 | `factor_conversion_dias` es obligatorio y debe ser ≥ 1. | `[APP]` |
+| CA-TPL-04 | Un tipo de plazo no puede eliminarse si existe alguna simulación que lo referencia. El sistema retorna HTTP 409 con mensaje descriptivo. | `[APP]` |
+| CA-TPL-05 | La operación de actualización sobre un tipo de plazo no afecta el historial de simulaciones ya guardadas; los snapshots en `simulaciones_bysone` son inmutables. | `[APP]` |
+
+---
+
+### roles_bysone
+
+| ID | Criterio | Responsable |
+|----|----------|-------------|
+| CA-ROL-01 | El nombre del rol es obligatorio y no puede superar 100 caracteres. | `[APP]` |
+| CA-ROL-02 | El nombre se normaliza a MAYÚSCULAS automáticamente al crear o actualizar. | `[APP]` |
+| CA-ROL-03 | No pueden existir dos roles con el mismo nombre (sin distinguir mayúsculas/minúsculas). Intentar crear o renombrar con nombre duplicado retorna HTTP 409. | `[APP]` |
+| CA-ROL-04 | Un rol no puede eliminarse si está asignado a uno o más usuarios. El sistema retorna HTTP 409. | `[APP]` |
+
+---
+
+### opciones_funcionales_bysone
+
+| ID | Criterio | Responsable |
+|----|----------|-------------|
+| CA-OPF-01 | El nombre de la opción funcional es obligatorio y no puede superar 150 caracteres. | `[APP]` |
+| CA-OPF-02 | El nombre se normaliza a MAYÚSCULAS automáticamente. | `[APP]` |
+| CA-OPF-03 | No pueden existir dos opciones funcionales con el mismo nombre (sin distinguir mayúsculas/minúsculas). Intentar crear o renombrar con nombre duplicado retorna HTTP 409. | `[APP]` |
+| CA-OPF-04 | Una opción funcional no puede eliminarse si está asignada a uno o más roles. El sistema retorna HTTP 409. | `[APP]` |
+
+---
+
+> Documento actualizado el 2026-04-15. Incluye criterios de tipos de plazo (CA-TPL), roles (CA-ROL) y opciones funcionales (CA-OPF). Debe revisarse y actualizarse cuando cambien el modelo de datos o las reglas de negocio.

@@ -31,9 +31,23 @@ export interface UsuarioMe {
   celular?: string
   proveedorOauth: ProveedorOauth
   fechaRegistro: string
+  fechaUltimaActualizacionPerfil?: string
   roles: string[]
   perfilInversion: PerfilInversionResumen | null
   requiereRecalibracion: boolean
+}
+
+export interface ActualizarUsuarioRequest {
+  nombreCompleto: string
+  celular?: string
+}
+
+export interface UltimaEncuesta {
+  id: number
+  fechaRealizacion: string
+  estado: EstadoEncuesta
+  puntajeTotal: number | null
+  perfilAsignado: PerfilInversionResumen | null
 }
 
 // ── Calibración ──────────────────────────────────────────────────────────────

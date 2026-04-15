@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import Spinner from '@/components/shared/Spinner'
@@ -10,6 +11,7 @@ interface Parametro { id: number; nombreParametro: string; valorParametro: strin
 
 export default function ParametrosPage() {
   const queryClient = useQueryClient()
+  const router = useRouter()
   const [editandoId, setEditandoId] = useState<number | null>(null)
   const [valorEdit, setValorEdit] = useState('')
   const [nuevoNombre, setNuevoNombre] = useState('')
@@ -37,7 +39,14 @@ export default function ParametrosPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="text-xl font-bold">Parámetros del sistema</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">Parámetros del sistema</h1>
+        <Button variant="outline" onClick={() => router.push('/admin')}>Cancelar</Button>
+      </div>
+
+      {errorForm && editandoId !== null && (
+        <p className="text-destructive text-sm bg-destructive/10 px-3 py-2 rounded">{errorForm}</p>
+      )}
 
       <div className="border rounded-lg overflow-hidden">
         <table className="w-full text-sm">
@@ -61,8 +70,12 @@ export default function ParametrosPage() {
                   <div className="flex gap-2 justify-end">
                     {editandoId === p.id ? (
                       <>
-                        <Button size="sm" onClick={() => mutActualizar.mutate({ id: p.id, valor: valorEdit })} disabled={mutActualizar.isPending}>Guardar</Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditandoId(null)}>Cancelar</Button>
+                        <Button size="sm" onClick={() => {
+                          if (!valorEdit.trim()) { setErrorForm('El valor no puede estar vacío.'); return }
+                          setErrorForm(null)
+                          mutActualizar.mutate({ id: p.id, valor: valorEdit })
+                        }} disabled={mutActualizar.isPending}>Guardar</Button>
+                        <Button size="sm" variant="outline" onClick={() => { setEditandoId(null); setErrorForm(null) }}>Cancelar</Button>
                       </>
                     ) : (
                       <Button size="sm" variant="outline" onClick={() => { setEditandoId(p.id); setValorEdit(p.valorParametro) }}>Editar</Button>

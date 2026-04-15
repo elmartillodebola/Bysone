@@ -34,6 +34,10 @@
 
 **RN-USU-05** — Cada vez que el perfil de un usuario cambia, se debe actualizar `fecha_ultima_actualizacion_perfil_inversion`. Este campo es la referencia que usa el sistema para determinar si el usuario requiere una nueva calibración.
 
+**RN-USU-06** — Un usuario autenticado puede editar únicamente su nombre completo y su número de celular a través de `PUT /api/v1/usuarios/me`. El correo electrónico y el proveedor OAuth provienen del Identity Provider y no son editables por el usuario.
+
+**RN-USU-07** — El celular es un campo opcional. Si el usuario lo deja en blanco durante la edición, se guarda como `NULL` en base de datos. El nombre completo es obligatorio y no puede quedar vacío.
+
 ---
 
 ## 2. Roles y Acceso Funcional
@@ -62,13 +66,19 @@
 
 ## 3. Perfiles de Inversión
 
-**RN-PER-01** — Existen tres perfiles de inversión: Conservador, Moderado y Agresivo. Cada perfil tiene una distribución porcentual sobre uno o más portafolios.
+**RN-PER-01** — Existen tres perfiles de inversión base: Conservador, Moderado y Agresivo. El sistema permite crear nuevos perfiles adicionales desde la pantalla de Configuración sin necesidad de redespliegue.
 
-**RN-PER-02** — La suma de los porcentajes asignados a los portafolios de un perfil debe ser exactamente 100%. Esta validación es responsabilidad de la capa de aplicación.
+**RN-PER-02** — La suma de los porcentajes asignados a los portafolios de un perfil debe ser exactamente 100%. Esta validación es responsabilidad de la capa de aplicación al actualizar la composición.
 
 **RN-PER-03** — Para cada combinación perfil-portafolio solo puede existir una fórmula de exposición. No se permiten duplicados.
 
 **RN-PER-04** — La fórmula de exposición define los umbrales mínimo y máximo de exposición permitida de un perfil sobre un portafolio. Sirve como límite de alerta o control de riesgo.
+
+**RN-PER-05** — Un perfil no puede eliminarse si algún usuario lo tiene asignado como perfil de inversión activo. El sistema debe devolver un error descriptivo y no proceder con la eliminación.
+
+**RN-PER-06** — El nombre del perfil es único en el sistema (sin distinguir mayúsculas/minúsculas). Intentar crear o renombrar un perfil con un nombre ya existente resulta en error HTTP 409.
+
+**RN-PER-07** — La actualización de composición (portafolios + porcentajes) y la de fórmulas de exposición son operaciones de reemplazo total: se eliminan todas las filas previas y se insertan las nuevas en la misma transacción.
 
 ---
 
@@ -192,4 +202,26 @@
 
 ---
 
-> Documento actualizado el 2026-04-14. Incluye reglas derivadas de la implementación completa de CRUDs admin (opciones de inversión, portafolios, preguntas de calibración, disclaimers). Debe actualizarse cada vez que el modelo de datos o los requisitos de negocio cambien.
+## 9. Tipos de Plazo
+
+**RN-TPL-01** — El catálogo `tipos_plazo` define las unidades de tiempo disponibles para las simulaciones de inversión (ej.: Días, Meses, Trimestres, Años). Solo los usuarios con rol `ADMIN` pueden gestionarlo desde el menú de Configuración Bysone.
+
+**RN-TPL-02** — El nombre de un tipo de plazo es único en el sistema sin distinguir mayúsculas/minúsculas. Crear o actualizar un tipo de plazo con un nombre ya existente resulta en error HTTP 409.
+
+**RN-TPL-03** — El campo `factor_conversion_dias` es obligatorio y debe ser al menos 1. Representa cuántos días equivale una unidad de ese tipo de plazo. El motor de simulación usa este factor para homogenizar los cálculos internos.
+
+**RN-TPL-04** — Un tipo de plazo no puede eliminarse si existe al menos una simulación persistida que lo referencia. El sistema devuelve HTTP 409 con mensaje descriptivo para evitar inconsistencias históricas.
+
+---
+
+## 10. Roles
+
+**RN-ROL-01** — El catálogo de roles define los niveles de acceso del sistema (ej.: ADMIN, USER, MAINTAINER). Solo los usuarios con rol `ADMIN` pueden gestionar este catálogo desde el menú de Configuración Bysone.
+
+**RN-ROL-02** — El nombre del rol es único en el sistema (sin distinguir mayúsculas/minúsculas) y se normaliza automáticamente a MAYÚSCULAS. Crear o renombrar un rol con nombre duplicado resulta en error HTTP 409.
+
+**RN-ROL-03** — Un rol no puede eliminarse si está asignado a uno o más usuarios. El sistema devuelve HTTP 409 con mensaje descriptivo.
+
+---
+
+> Documento actualizado el 2026-04-15. Incluye reglas de tipos de plazo (sección 9) y roles (sección 10). Debe actualizarse cada vez que el modelo de datos o los requisitos de negocio cambien.

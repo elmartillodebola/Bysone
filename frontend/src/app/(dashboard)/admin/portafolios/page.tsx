@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import Spinner from '@/components/shared/Spinner'
@@ -17,6 +18,7 @@ const empty = { nombre: '', descripcion: '', rentabilidadMinima: '', rentabilida
 
 export default function PortafoliosPage() {
   const queryClient = useQueryClient()
+  const router = useRouter()
   const [form, setForm] = useState(empty)
   const [editandoId, setEditandoId] = useState<number | null>(null)
   const [gestionandoOpciones, setGestionandoOpciones] = useState<number | null>(null)
@@ -90,7 +92,10 @@ export default function PortafoliosPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="text-xl font-bold">Portafolios de inversión</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">Portafolios de inversión</h1>
+        <Button variant="outline" onClick={() => router.push('/admin')}>Cancelar</Button>
+      </div>
 
       {gestionandoOpciones !== null && (
         <div className="border rounded-lg p-5 space-y-3 bg-card">
@@ -133,7 +138,7 @@ export default function PortafoliosPage() {
                   <div className="flex gap-1 justify-end flex-wrap">
                     <Button size="sm" variant="outline" onClick={() => iniciarEdicion(p)}>Editar</Button>
                     <Button size="sm" variant="outline" onClick={() => abrirGestionOpciones(p)}>Opciones</Button>
-                    <Button size="sm" variant="outline" onClick={() => mutEliminar.mutate(p.id)}>Eliminar</Button>
+                    <Button size="sm" variant="outline" onClick={() => mutEliminar.mutate(p.id)} disabled={mutEliminar.isPending}>Eliminar</Button>
                   </div>
                 </td>
               </tr>

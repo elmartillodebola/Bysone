@@ -8,5 +8,7 @@ import java.util.Optional;
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     Optional<Usuario> findByOauthSub(String oauthSub);
     Optional<Usuario> findByCorreoUsuario(String correoUsuario);
+    boolean existsByPerfilInversionId(Long perfilInversionId);
+    boolean existsByRolesId(Long rolId);
 }
 

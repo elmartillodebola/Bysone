@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import Spinner from '@/components/shared/Spinner'
@@ -14,6 +15,7 @@ const emptyOpcion = { textoOpcion: '', puntaje: '', orden: '' }
 
 export default function PreguntasPage() {
   const queryClient = useQueryClient()
+  const router = useRouter()
   const [formPregunta, setFormPregunta] = useState(emptyPregunta)
   const [editandoPreguntaId, setEditandoPreguntaId] = useState<number | null>(null)
   const [expandidaId, setExpandidaId] = useState<number | null>(null)
@@ -78,7 +80,10 @@ export default function PreguntasPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="text-xl font-bold">Cuestionario de calibración</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">Cuestionario de calibración</h1>
+        <Button variant="outline" onClick={() => router.push('/admin')}>Cancelar</Button>
+      </div>
       {error && <p className="text-destructive text-sm bg-destructive/10 px-3 py-2 rounded">{error}</p>}
 
       <div className="space-y-3">
