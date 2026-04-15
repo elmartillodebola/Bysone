@@ -8,6 +8,9 @@ import java.util.List;
 
 public interface PerfilInversionRepository extends JpaRepository<PerfilInversion, Long> {
 
-    @Query("SELECT p FROM PerfilInversion p LEFT JOIN FETCH p.portafolios pp LEFT JOIN FETCH pp.portafolioInversion LEFT JOIN FETCH p.formulasExposicion")
+    @Query("SELECT DISTINCT p FROM PerfilInversion p LEFT JOIN FETCH p.portafolios pp LEFT JOIN FETCH pp.portafolioInversion")
     List<PerfilInversion> findAllWithPortafolios();
+
+    @Query("SELECT DISTINCT p FROM PerfilInversion p LEFT JOIN FETCH p.formulasExposicion fe LEFT JOIN FETCH fe.portafolioInversion")
+    List<PerfilInversion> findAllWithFormulas();
 }
