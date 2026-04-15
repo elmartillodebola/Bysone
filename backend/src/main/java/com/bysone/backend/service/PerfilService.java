@@ -23,7 +23,9 @@ public class PerfilService {
 
     @Transactional(readOnly = true)
     public List<PerfilInversionResponse> listarPerfiles() {
-        return perfilRepo.findAllWithPortafolios().stream()
+        List<PerfilInversion> perfiles = perfilRepo.findAllWithPortafolios();
+        perfilRepo.findAllWithFormulas(); // initializes formulasExposicion on cached instances
+        return perfiles.stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
