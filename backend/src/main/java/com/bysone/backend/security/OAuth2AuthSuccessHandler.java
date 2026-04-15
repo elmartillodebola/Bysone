@@ -33,7 +33,12 @@ public class OAuth2AuthSuccessHandler extends SimpleUrlAuthenticationSuccessHand
     ) throws IOException {
 
         OAuth2UsuarioPrincipal principal = (OAuth2UsuarioPrincipal) authentication.getPrincipal();
-        String token = jwtService.generateToken(principal.getUsuario());
+
+        // Incluir roles en el JWT para que el frontend pueda controlar acceso al menú de Configuración
+        java.util.List<String> roles = principal.getUsuario().getRoles().stream()
+                .map(r -> r.getNombreRol())
+                .toList();
+        String token = jwtService.generateToken(java.util.Map.of("roles", roles), principal.getUsuario());
 
         String redirectUrl = frontendUrl + "/auth/callback?token=" + token;
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);

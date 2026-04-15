@@ -9,10 +9,12 @@ import BarraProgreso from '@/components/calibracion/BarraProgreso'
 import Spinner from '@/components/shared/Spinner'
 import { Button } from '@/components/ui/Button'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 export default function CalibracionPage() {
   const router = useRouter()
+  // Selección local para la última pregunta (se confirma al hacer clic en "Completar")
+  const [seleccionUltima, setSeleccionUltima] = useState<number | null>(null)
 
   const { data: preguntas = [], isLoading } = useQuery<PreguntaCalibracion[]>({
     queryKey: ['preguntas-calibracion'],
@@ -46,6 +48,11 @@ export default function CalibracionPage() {
     }
   }, [resultado])
 
+  // Limpiar selección al cambiar de pregunta
+  useEffect(() => {
+    setSeleccionUltima(null)
+  }, [pasoActual])
+
   if (isLoading) return <Spinner />
 
   if (preguntas.length === 0) {
@@ -57,6 +64,13 @@ export default function CalibracionPage() {
   }
 
   const preguntaActual = preguntas[pasoActual]
+
+  async function handleCompletarConUltima() {
+    if (seleccionUltima !== null) {
+      await responder(seleccionUltima)
+    }
+    await completar()
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -75,12 +89,17 @@ export default function CalibracionPage() {
 
       <PreguntaCard
         pregunta={preguntaActual}
-        onSeleccionar={esUltimaPregunta ? undefined : responder}
+        onSeleccionar={esUltimaPregunta ? setSeleccionUltima : responder}
+        seleccionId={esUltimaPregunta ? seleccionUltima : undefined}
         cargando={cargando}
       />
 
       {esUltimaPregunta && (
-        <Button onClick={completar} disabled={cargando} className="w-full">
+        <Button
+          onClick={handleCompletarConUltima}
+          disabled={cargando || seleccionUltima === null}
+          className="w-full"
+        >
           {cargando ? 'Procesando...' : 'Completar encuesta'}
         </Button>
       )}

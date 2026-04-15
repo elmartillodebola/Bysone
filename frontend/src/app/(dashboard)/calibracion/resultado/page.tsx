@@ -1,10 +1,7 @@
-import { auth } from '@/lib/auth'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 
-export default async function ResultadoCalibracionPage() {
-  const session = await auth()
-
+export default function ResultadoCalibracionPage() {
   return (
     <div className="max-w-xl mx-auto text-center space-y-6 py-12">
       <div className="text-5xl">🎯</div>

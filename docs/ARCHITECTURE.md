@@ -19,7 +19,6 @@ La aplicación adopta un modelo **multinube** con proveedores especializados por
 | Persistencia | Neon | PostgreSQL — DBaaS |
 | Cómputo Frontend | Fly.io | PaaS (compute gestionado) |
 | Cómputo Backend | Fly.io | Contenedor (PaaS) |
-| Tópicos y Colas | Fly.io | Servicio contenerizado (broker) |
 | Gestión de parámetros | Fly.io | Variables de entorno (PaaS config) |
 | Dominio / Acceso público | Fly.io | URL pública HTTPS |
 

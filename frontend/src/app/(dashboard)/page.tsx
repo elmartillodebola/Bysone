@@ -1,15 +1,23 @@
-import { auth } from '@/lib/auth'
-import Link from 'next/link'
-import { Button } from '@/components/ui/Button'
+'use client'
 
-export default async function DashboardPage() {
-  const session = await auth()
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import api from '@/lib/api'
+
+export default function DashboardPage() {
+  const [nombre, setNombre] = useState<string>('')
+
+  useEffect(() => {
+    api.get('/usuarios/me')
+      .then(res => setNombre(res.data.nombreCompleto?.split(' ')[0] ?? ''))
+      .catch(() => {})
+  }, [])
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-foreground">
-          Bienvenido, {session?.user?.name?.split(' ')[0]}
+          Bienvenido{nombre ? `, ${nombre}` : ''}
         </h1>
         <p className="text-muted-foreground mt-1">
           Simula y compara perfiles de inversión para tu pensión voluntaria

@@ -25,7 +25,7 @@ Este documento registra de forma estructurada todo el código generado con asist
 | Backend — Servicios | 5 servicios de negocio | ~600 |
 | Backend — Controladores | 5 controladores REST | ~400 |
 | Backend — Seguridad | JWT + OAuth2 (5 clases) | ~300 |
-| Backend — Config / Mensajería | 6 clases de configuración y mensajería | ~200 |
+| Backend — Config | 3 clases de configuración | ~100 |
 | Backend — Tests | 1 clase, 4 tests unitarios | ~135 |
 | Frontend — App Router | 9 páginas (7 rutas) + layout + API route | ~500 |
 | Frontend — Componentes | 12 componentes React | ~600 |
@@ -40,13 +40,11 @@ Este documento registra de forma estructurada todo el código generado con asist
 ### 3.1 `docker-compose.yml` (raíz del proyecto)
 
 **Generado con IA:** Sí — 100%  
-**Descripción:** Orquesta 5 servicios con healthchecks y dependencias ordenadas.
+**Descripción:** Orquesta 4 servicios con healthchecks y dependencias ordenadas.
 
 | Servicio | Imagen | Puerto |
 |----------|--------|--------|
 | `postgres` | postgres:16-alpine | 5432 |
-| `rabbitmq` | rabbitmq:3-management | 5672 / 15672 |
-| `mailhog` | mailhog/mailhog | 1025 / 8025 |
 | `backend` | build ./backend | 8080 |
 | `frontend` | build ./frontend | 3000 |
 
@@ -184,7 +182,7 @@ disclaimers                   roles
 **Patrón:** buscar por (proveedorOauth, proveedorId) → crear si no existe → generar JWT.
 
 #### `CalibracionService`
-**Responsabilidades:** obtener preguntas activas, guardar encuesta, calcular perfil por suma de puntajes, publicar evento RabbitMQ al completar.  
+**Responsabilidades:** obtener preguntas activas, guardar encuesta, calcular perfil por suma de puntajes.  
 **Lógica POO:** cada `OpcionRespuesta` tiene un `puntaje`; la suma determina el perfil (umbrales configurables).
 
 #### `SimulacionService`
@@ -239,15 +237,12 @@ Por cada período 1..N:
 **Proveedores configurados:** Google + Microsoft Entra (NO GitHub — CI/CD only)  
 **Generado con IA:** Sí — 100%
 
-### 5.7 Configuración y Mensajería
+### 5.7 Configuración
 
 | Clase | Propósito |
 |-------|-----------|
-| `RabbitMqConfig` | Declara exchange `bysone.notificaciones`, cola `bysone.email`, binding |
 | `GlobalExceptionHandler` | @RestControllerAdvice: 400 (validación), 404 (not found), 500 (general) |
 | `OpenApiConfig` | Springdoc: título, versión, esquema `bearerAuth` |
-| `NotificacionProducer` | `@Async` publicar evento calibración completada en RabbitMQ |
-| `NotificacionConsumer` | `@RabbitListener` consumir evento → enviar email vía JavaMailSender |
 
 **Generado con IA:** Sí — 100%
 

@@ -494,7 +494,7 @@ Registra la respuesta de una pregunta dentro de una encuesta. Solo una respuesta
 
 > **Ref:** RN-CAL-07, RN-CAL-08, CA-ENC-05 a CA-ENC-07
 
-Calcula el puntaje total, determina el perfil de inversión según los parámetros del sistema, actualiza la encuesta y el perfil del usuario. Publica evento RabbitMQ para notificación por email.
+Calcula el puntaje total, determina el perfil de inversión según los parámetros del sistema, actualiza la encuesta y el perfil del usuario.
 
 **Autenticación:** `Bearer JWT` (obligatorio)
 

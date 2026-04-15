@@ -20,6 +20,10 @@
 
 ## 1. Usuarios y Autenticación
 
+**BR-SES-002** — Al cerrar sesión, el backend fuerza a Google a mostrar el selector de cuenta en el siguiente inicio de sesión (`prompt=select_account`). Esto impide que el usuario vuelva a entrar automáticamente con la sesión OAuth cacheada en el navegador, garantizando que siempre haya una acción consciente de autenticación.
+
+**BR-SES-001** — La sesión de un usuario expira automáticamente tras un período de inactividad configurable. El tiempo de inactividad se almacena en `parametros_bysone` bajo la clave `TIMEOUT_SESION_INACTIVIDAD_MINUTOS` (valor por defecto: 5 minutos). El frontend consulta este valor en `/api/v1/config/sesion` (endpoint público) al iniciar y activa un temporizador que se reinicia ante cualquier evento del usuario (clic, teclado, scroll). Al cumplirse el tiempo sin actividad, el token JWT se elimina del almacenamiento local y el usuario es redirigido a `/login`. Un administrador puede cambiar el valor directamente en la base de datos sin necesidad de redespliegue.
+
 **RN-USU-01** — El acceso al sistema es exclusivamente mediante OAuth2. Los únicos proveedores aceptados son `GOOGLE` y `MICROSOFT`. No existe registro con usuario y contraseña propios.
 
 **RN-USU-02** — El correo electrónico de un usuario es único en el sistema. No pueden existir dos cuentas con el mismo correo.
@@ -39,6 +43,20 @@
 **RN-ROL-02** — Un rol agrupa un conjunto de opciones funcionales. El acceso a cualquier funcionalidad del sistema está determinado por los roles asignados al usuario.
 
 **RN-ROL-03** — La misma opción funcional puede pertenecer a más de un rol.
+
+**BR-ROL-001** — El sistema define tres roles con la siguiente distribución de opciones funcionales:
+
+| Rol | Opciones funcionales |
+|---|---|
+| `ADMIN` | GESTIONAR_USUARIOS, GESTIONAR_PERFILES, GESTIONAR_PORTAFOLIOS, REALIZAR_SIMULACION, VER_HISTORIAL_SIMULACIONES, **GESTIONAR_PARAMETROS** |
+| `MAINTAINER` | GESTIONAR_PERFILES, GESTIONAR_PORTAFOLIOS, REALIZAR_SIMULACION, VER_HISTORIAL_SIMULACIONES |
+| `USER` | REALIZAR_SIMULACION, VER_HISTORIAL_SIMULACIONES |
+
+**BR-ROL-002** — Las funcionalidades de uso final (calibración, simulación, historial, perfil propio) son accesibles para cualquier usuario autenticado independientemente de su rol. La única funcionalidad exclusiva del rol `ADMIN` es el menú de **Configuración Bysone** (`GESTIONAR_PARAMETROS`).
+
+**BR-ROL-003** — El rol del usuario se incluye como claim `roles` dentro del JWT emitido al autenticarse. El frontend lo utiliza para mostrar u ocultar el menú de Configuración sin necesidad de una llamada adicional al backend. El endpoint `/api/v1/usuarios/me` también devuelve los roles para uso en cualquier componente que lo requiera.
+
+**BR-ROL-004** — Las rutas `/api/v1/admin/**` están protegidas exclusivamente para el rol `ADMIN`. Si un usuario sin ese rol intenta acceder directamente a una URL del panel de administración, el frontend lo redirige al inicio y el backend responde con HTTP 403.
 
 ---
 
@@ -62,9 +80,21 @@
 
 **RN-POR-03** — Cada opción de inversión tiene su propia rentabilidad mínima y máxima, independiente del portafolio al que pertenezca.
 
+**RN-POR-04** — El nombre de cada opción de inversión es único en el sistema. No pueden existir dos opciones con el mismo nombre (restricción `UNIQUE` en BD + validación en aplicación).
+
+**BR-OPC-001** — Solo los usuarios con rol `ADMIN` pueden crear, editar y gestionar opciones de inversión. La rentabilidad mínima debe ser ≥ 0 y la rentabilidad máxima debe ser > 0. La rentabilidad mínima no puede superar a la máxima.
+
+**BR-OPC-002** — Una opción de inversión no puede eliminarse si está asignada a uno o más portafolios. El sistema responde con HTTP 409 indicando la restricción. Para retirarla, primero debe desvincularse de todos los portafolios que la contienen.
+
+**BR-OPC-003** — El nombre de cada portafolio es único en el sistema. La asignación de opciones de inversión a un portafolio es una operación de reemplazo completo: `PUT /admin/portafolios/{id}/opciones` sustituye todas las opciones actuales por las enviadas en la petición.
+
+**BR-OPC-004** — Un portafolio no puede eliminarse si está asignado a uno o más perfiles de inversión. El sistema responde con HTTP 409. Para eliminarlo, primero debe desvincularse de todos los perfiles.
+
 ---
 
 ## 5. Calibración de Perfil
+
+**BR-CAL-001** — Si un usuario recarga o vuelve a la pantalla de calibración mientras tiene una encuesta en estado `PENDIENTE`, el sistema detecta la encuesta existente (responde con HTTP 409 en el endpoint de inicio) y retoma el flujo desde la última pregunta no respondida. El frontend lee el campo `preguntasRespondidas` del cuerpo del 409 y posiciona el paso en esa posición. El historial de respuestas ya registradas no se toca.
 
 **RN-CAL-01** — Todo usuario nuevo debe completar una encuesta de calibración antes de poder realizar simulaciones. Sin perfil asignado no se habilita la simulación.
 
@@ -80,6 +110,14 @@
 
 **RN-CAL-06** — Solo se presentan al usuario las preguntas marcadas como activas (`activa = TRUE`). Las preguntas inactivas se excluyen del cuestionario sin eliminarse del catálogo.
 
+**BR-CAL-002** — Solo los usuarios con rol `ADMIN` pueden crear, editar y activar/desactivar preguntas de calibración y sus opciones de respuesta.
+
+**BR-CAL-003** — Una pregunta solo puede marcarse como activa (`activa = TRUE`) si tiene al menos 2 opciones de respuesta asociadas. El sistema responde con HTTP 409 si se intenta activar una pregunta sin el mínimo de opciones. Criterio de aceptación: CA-ORC-05.
+
+**BR-CAL-004** — Una opción de respuesta no puede eliminarse si existe al menos una `respuesta_encuesta_calibracion` que la referencia. El sistema responde con HTTP 409. Esto garantiza la integridad histórica de las encuestas completadas.
+
+**BR-CAL-005** — Las opciones de respuesta no exponen el campo `puntaje` en los endpoints públicos de calibración para no revelar la lógica de scoring al usuario. El puntaje es gestionado únicamente desde el panel de administración.
+
 **RN-CAL-07** — El perfil resultante se determina por la suma de los puntajes de las opciones seleccionadas. Los rangos de puntaje por perfil son configurables a través de `parametros_bysone`.
 
 **RN-CAL-08** — Al completar la encuesta se deben actualizar simultáneamente:
@@ -93,7 +131,7 @@
 
 ---
 
-## 6. Simulación y Proyección
+## 6. Simulación y Proyección (Evaluar si se justifica persistir las simulaciones)
 
 **RN-SIM-01** — Un usuario puede simular usando su perfil asignado o escogiendo cualquier otro perfil disponible. La simulación no modifica el perfil del usuario.
 
@@ -115,6 +153,9 @@
 
 **RN-SIM-10** — Al guardar una simulación, se referencia el disclaimer vigente en ese momento. Un disclaimer se considera vigente si `activo = TRUE` y la fecha actual está dentro del rango `fecha_vigencia_desde` / `fecha_vigencia_hasta` (o si `fecha_vigencia_hasta` es nula).
 
+**RN-SIM-11** — Cuando un usuario realice la simulación con alguno de los perfiles disponibles, y ser presentado el resultado de la simulación, dar la opcion por medio de un boton de comparar dicha simualacion con otros perfiles de inversion.
+
+**RN-SIM-12** — Cuando un usuario realice la simulación y escoja comparar su simualación con los demas perfiles, la grafica le permitira comparar entre maximos, entre minimos y entre medias de cada perfil unicamente. 
 ---
 
 ## 7. Disclaimers
@@ -127,6 +168,12 @@
 
 **RN-DIS-04** — Los disclaimers no se eliminan; se desactivan (`activo = FALSE`) o se les asigna una `fecha_vigencia_hasta` para que dejen de aplicar. El historial de disclaimers se conserva.
 
+**BR-DIS-001** — Solo los usuarios con rol `ADMIN` pueden crear, editar y activar/desactivar disclaimers a través del menú de Configuración Bysone.
+
+**BR-DIS-002** — Si se suministra `fecha_vigencia_hasta`, esta debe ser estrictamente posterior a `fecha_vigencia_desde`. El sistema valida esta restricción y responde con HTTP 400 si no se cumple.
+
+**BR-DIS-003** — El endpoint público `GET /api/v1/disclaimers/vigente` devuelve el disclaimer activo cuya `fecha_vigencia_desde` sea la más reciente y no haya vencido. Es consumido por el flujo de simulación antes de confirmar el guardado.
+
 ---
 
 ## 8. Parámetros del Sistema
@@ -137,6 +184,12 @@
 
 **RN-PAR-03** — Los valores de los parámetros son de tipo texto (`VARCHAR`). La capa de aplicación es responsable de parsear el valor según el tipo de dato esperado (entero, decimal, fecha, etc.).
 
+**BR-PAR-001** — Solo los usuarios con rol `ADMIN` pueden crear, consultar y modificar parámetros del sistema a través del menú de Configuración Bysone. Los cambios aplican de inmediato sin necesidad de redespliegue.
+
+**BR-PAR-002** — Al crear un nuevo parámetro, el nombre se normaliza automáticamente a `MAYÚSCULAS_CON_GUIONES_BAJOS`. No pueden existir dos parámetros con el mismo nombre (restricción `UNIQUE` en BD).
+
+**BR-PAR-003** — Los parámetros no se eliminan. Si un parámetro deja de aplicar, su valor puede actualizarse o dejarse en desuso; la eliminación requeriría intervención directa en la base de datos por un DBA. Esto preserva el historial de configuración del sistema.
+
 ---
 
-> Documento generado el 2026-04-13. Debe actualizarse cada vez que el modelo de datos o los requisitos de negocio cambien.
+> Documento actualizado el 2026-04-14. Incluye reglas derivadas de la implementación completa de CRUDs admin (opciones de inversión, portafolios, preguntas de calibración, disclaimers). Debe actualizarse cada vez que el modelo de datos o los requisitos de negocio cambien.

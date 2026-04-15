@@ -39,26 +39,6 @@ spring:
           # microsoft: deshabilitado — próxima versión
           # google: proveedor built-in de Spring Security — sin config extra
 
-  # RabbitMQ
-  rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
-
-  # Email (MailHog en local, SMTP real en producción)
-  mail:
-    host: ${MAIL_HOST:localhost}
-    port: ${MAIL_PORT:1025}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
-    properties:
-      mail:
-        smtp:
-          auth: false
-          starttls:
-            enable: false
-
 # JWT
 jwt:
   secret: ${JWT_SECRET:changeme-32-chars-minimum-secret-key!!}
