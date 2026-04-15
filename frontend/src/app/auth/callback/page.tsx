@@ -1,14 +1,15 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Spinner from '@/components/shared/Spinner'
 
 /**
  * El backend redirige aquí tras el login OAuth2 con el JWT en ?token=...
  * Lo guardamos en localStorage y redirigimos al dashboard.
+ * useSearchParams requiere Suspense boundary para el build estático de Next.js.
  */
-export default function AuthCallbackPage() {
+function CallbackHandler() {
   const router = useRouter()
   const params = useSearchParams()
 
@@ -29,5 +30,19 @@ export default function AuthCallbackPage() {
         <p className="text-muted-foreground text-sm">Iniciando sesión...</p>
       </div>
     </div>
+  )
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <Spinner />
+        </div>
+      }
+    >
+      <CallbackHandler />
+    </Suspense>
   )
 }

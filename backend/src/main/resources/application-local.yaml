@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/bysone?currentSchema=bysone
+    username: bysone
+    password: bysone_local_2026
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: 958427260634-ap70c0ddc00s0r5o3dqjdo079bktj99h.apps.googleusercontent.com
+            client-secret: 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
+
+bysone:
+  frontend-url: http://localhost:3000
+  jwt:
+    secret: bysone-hackaton-2026-jwt-secret-key-proteccion!!

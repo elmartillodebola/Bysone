@@ -32,8 +32,14 @@ public class CustomOidcUserService extends OidcUserService {
         String email    = resolveEmail(oidcUser, provider);
         String name     = resolveName(oidcUser, email);
 
+        // 1. Buscar por oauth_sub (login normal)
+        // 2. Si no existe, buscar por email (usuario pre-sembrado, p.ej. admin inicial)
+        //    → vincular el oauth_sub real y conservar roles asignados en semilla
+        // 3. Si tampoco existe, crear nuevo usuario con rol USER
         Usuario usuario = usuarioRepository.findByOauthSub(oauthSub)
-                .orElseGet(() -> createUser(oauthSub, email, name, provider));
+                .orElseGet(() -> usuarioRepository.findByCorreoUsuario(email)
+                        .map(u -> { u.setOauthSub(oauthSub); return usuarioRepository.save(u); })
+                        .orElseGet(() -> createUser(oauthSub, email, name, provider)));
 
         return new OAuth2UsuarioPrincipal(usuario, oidcUser.getAttributes(), oidcUser.getIdToken(), oidcUser.getUserInfo());
     }

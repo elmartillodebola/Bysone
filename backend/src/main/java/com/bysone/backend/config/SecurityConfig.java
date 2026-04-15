@@ -11,6 +11,9 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -29,8 +32,25 @@ public class SecurityConfig {
     private final CustomOidcUserService customOidcUserService;
     private final OAuth2AuthSuccessHandler oAuth2AuthSuccessHandler;
 
+    /**
+     * Fuerza a Google a mostrar el selector de cuenta en cada login.
+     * Así, al cerrar sesión y volver a entrar, el usuario siempre elige
+     * o confirma su cuenta en lugar de entrar automáticamente con la sesión cacheada.
+     */
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public OAuth2AuthorizationRequestResolver authorizationRequestResolver(
+            ClientRegistrationRepository clientRegistrationRepository) {
+        DefaultOAuth2AuthorizationRequestResolver resolver =
+                new DefaultOAuth2AuthorizationRequestResolver(
+                        clientRegistrationRepository, "/oauth2/authorization");
+        resolver.setAuthorizationRequestCustomizer(customizer ->
+                customizer.additionalParameters(params -> params.put("prompt", "select_account")));
+        return resolver;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http,
+            OAuth2AuthorizationRequestResolver authorizationRequestResolver) throws Exception {
         return http
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .csrf(AbstractHttpConfigurer::disable)
@@ -40,6 +60,7 @@ public class SecurityConfig {
                                 "/oauth2/**",
                                 "/login/**",
                                 "/actuator/health",
+                                "/api/v1/config/**",   // BR-SES-001: config pública (timeout de sesión)
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**"
@@ -49,6 +70,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(ep -> ep
+                                .authorizationRequestResolver(authorizationRequestResolver))
                         .userInfoEndpoint(ui -> ui
                                 .oidcUserService(customOidcUserService)  // Google (OIDC)
                         )

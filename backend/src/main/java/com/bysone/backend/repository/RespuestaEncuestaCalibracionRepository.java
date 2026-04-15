@@ -8,4 +8,5 @@ import java.util.List;
 public interface RespuestaEncuestaCalibracionRepository extends JpaRepository<RespuestaEncuestaCalibracion, Long> {
     List<RespuestaEncuestaCalibracion> findByEncuestaCalibracionId(Long idEncuesta);
     boolean existsByEncuestaCalibracionIdAndPreguntaCalibracionId(Long idEncuesta, Long idPregunta);
+    int countByEncuestaCalibracionId(Long idEncuesta);
 }

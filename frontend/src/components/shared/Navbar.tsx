@@ -4,11 +4,14 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
+// TODO BR-ROL-002: cuando finalice la implementación de funcionalidades,
+// filtrar el ítem "Configuración" usando useCurrentUser().esAdmin
 const links = [
   { href: '/', label: 'Inicio' },
   { href: '/calibracion', label: 'Calibración' },
   { href: '/simulacion', label: 'Simulación' },
   { href: '/perfil', label: 'Mi Perfil' },
+  { href: '/admin', label: 'Configuración' },
 ]
 
 export default function Navbar() {
@@ -22,7 +25,7 @@ export default function Navbar() {
           href={href}
           className={cn(
             'px-3 py-2 rounded-md text-sm font-medium transition-colors',
-            pathname === href
+            pathname.startsWith(href) && (href !== '/' || pathname === '/')
               ? 'bg-primary text-primary-foreground'
               : 'text-foreground hover:bg-accent'
           )}

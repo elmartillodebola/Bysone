@@ -24,7 +24,7 @@
 |---------|-----|--------------------------|
 | **P1** | Backend — Dominio | Arquitectura hexagonal, lógica de negocio, motor de simulación, APIs REST |
 | **P2** | Frontend | Next.js, pantallas, flujos UI, integración con API, gráficas |
-| **P3** | DevOps + Backend Infra | Infraestructura, CI/CD, adaptadores JPA / RabbitMQ / OAuth2, soporte backend |
+| **P3** | DevOps + Backend Infra | Infraestructura, CI/CD, adaptadores JPA / OAuth2, soporte backend |
 
 ---
 
@@ -55,7 +55,6 @@ backend/src/main/java/com/proteccion/portafolio/
 │       └── response/    ← DTOs de salida
 └── infrastructure/
     ├── persistence/     ← Adaptadores JPA (implementan puertos out)
-    ├── messaging/       ← Adaptadores RabbitMQ (producer + consumer)
     ├── oauth/           ← Configuración Spring Security OAuth2
     └── config/          ← Beans, configuración Spring, Flyway
 ```
@@ -103,7 +102,7 @@ frontend/src/
 
 ### P3 — Infraestructura local y repositorio
 
-- Crear `docker-compose.yml` con servicios: PostgreSQL, RabbitMQ, backend, frontend
+- Crear `docker-compose.yml` con servicios: PostgreSQL, backend, frontend
 - Configurar `.env.example` con todas las variables requeridas
 - Crear estructura de ramas en GitHub: `main`, `develop`, `feature/*`
 - Validar que Flyway aplica V1 y V2 sin errores al levantar el backend
@@ -142,8 +141,6 @@ frontend/src/
   - Filtro de validación JWT OAuth2 (`BearerTokenAuthenticationFilter`)
   - Extracción de `oauth_sub` y `proveedor_oauth` del token
   - Creación automática de usuario en primera sesión
-- Producer RabbitMQ: publica evento `PerfilActualizadoEvent` al completar calibración
-- Consumer RabbitMQ (notification worker): recibe evento → envía email SMTP
 
 ---
 
@@ -173,7 +170,7 @@ Trabajo en paralelo. P1 expone endpoints; P2 integra desde UI; P3 apoya con test
 - `GET /api/v1/calibracion/preguntas` → lista preguntas activas con sus opciones, ordenadas
 - `POST /api/v1/calibracion/encuestas` → crea encuesta con `origen: DEMANDA | SISTEMA`
 - `POST /api/v1/calibracion/encuestas/{id}/respuestas` → registra respuesta por pregunta
-- `POST /api/v1/calibracion/encuestas/{id}/completar` → calcula puntaje, asigna perfil, actualiza usuario, publica evento RabbitMQ
+- `POST /api/v1/calibracion/encuestas/{id}/completar` → calcula puntaje, asigna perfil, actualiza usuario
 
 **P2 — UI**
 - Wizard paso a paso: una pregunta por pantalla con barra de progreso (`BarraProgreso`)
@@ -182,9 +179,6 @@ Trabajo en paralelo. P1 expone endpoints; P2 integra desde UI; P3 apoya con test
 - `ResultadoPerfil`: muestra el perfil asignado (Conservador / Moderado / Agresivo), descripción y distribución de portafolios
 - Manejo de estado del wizard con `useCalibracion` (pregunta actual, respuestas acumuladas, loading)
 
-**P3**
-- Tests unitarios del adaptador R2DBC de calibración
-- Validar que el evento RabbitMQ llega al worker y dispara el email
 
 ---
 
@@ -219,12 +213,6 @@ Trabajo en paralelo. P1 expone endpoints; P2 integra desde UI; P3 apoya con test
 
 ---
 
-### Módulo Notificaciones
-
-**P3**
-- Worker completo: consumer RabbitMQ → template de email HTML → envío SMTP
-- Email al completar calibración: informa el perfil asignado y próxima fecha de recalibración
-
 ---
 
 ## 5. Fase 3 — Integración y pruebas · Días 10–12
@@ -237,9 +225,8 @@ Trabajo en paralelo. P1 expone endpoints; P2 integra desde UI; P3 apoya con test
 
 | Capa | Componente | Herramienta |
 |------|-----------|-------------|
-| Backend — Dominio | Motor de simulación, scoring calibración | JUnit 5 + StepVerifier |
-| Backend — Adapters | Repositorios R2DBC, consumer RabbitMQ | JUnit 5 + Mockito |
-| Backend — API | Controllers WebFlux | WebTestClient |
+| Backend — Dominio | Motor de simulación, scoring calibración | JUnit 5 + Mockito |
+| Backend — API | Controllers Spring MVC | MockMvc |
 | Frontend | `FormularioSimulacion`, `CalibrationWizard` | Jest + Testing Library |
 | Frontend | `GraficaProyeccion`, `PerfilCard` | Jest (render + snapshot) |
 | Frontend | `useSimulacion`, `useCalibracion` | Jest (hooks testing) |
@@ -258,12 +245,9 @@ Trabajo en paralelo. P1 expone endpoints; P2 integra desde UI; P3 apoya con test
 # Crear apps
 fly apps create bysone-backend
 fly apps create bysone-frontend
-fly apps create bysone-broker
-
 # Configurar secretos (una sola vez por app)
 fly secrets set --app bysone-backend \
   DATABASE_URL=... \
-  RABBITMQ_URL=... \
   GOOGLE_CLIENT_ID=... \
   JWT_SECRET=...
 
@@ -314,7 +298,6 @@ push main    → CI (build + test) → deploy producción (Fly.io)
 | Base de datos | JPA + `spring-boot-starter-data-jpa` + PostgreSQL JDBC |
 | Migraciones | Flyway (V1 schema + V2 semilla + V3 roles) |
 | Autenticación | Spring Security + OAuth2 Client + JWT |
-| Mensajería | Spring AMQP (RabbitMQ) |
 | Documentación API | SpringDoc OpenAPI (`springdoc-openapi-starter-webmvc-ui`) |
 | Tests | JUnit 5 + Mockito + MockMvc |
 
@@ -371,4 +354,4 @@ Fase 0 ────────────────────────�
 | P2 bloqueado esperando endpoints de P1 | Alto | P1 publica contrato OpenAPI al inicio de Fase 1; P2 trabaja con mocks de Axios hasta que los endpoints estén listos |
 | Complejidad JPA con esquema multi-tabla | Bajo | JPA estándar con Hibernate, más maduro y documentado que R2DBC |
 | OAuth2 con múltiples proveedores | Medio | Configurar y probar Google primero; Microsoft al validar el flujo base |
-| Tiempo insuficiente para todos los bonus | Bajo | POO avanzada y cola real están en el diseño desde el inicio; tests y object storage son los que más tiempo toman — priorizar tests |
+| Tiempo insuficiente para todos los bonus | Bajo | POO avanzada está en el diseño desde el inicio; tests y object storage son los que más tiempo toman — priorizar tests |

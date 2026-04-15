@@ -192,7 +192,6 @@ Aplican a todas las tablas del modelo.
 | CA-ENC-06 | `id_perfil_resultado` solo puede establecerse cuando `estado = 'COMPLETADA'`. | `[APP]` |
 | CA-ENC-07 | Al completar la encuesta, `puntaje_total`, `id_perfil_resultado` y `estado` deben actualizarse en la misma transacción. | `[APP]` |
 | CA-ENC-08 | Un usuario no puede tener más de una encuesta en estado `'PENDIENTE'` al mismo tiempo. | `[APP]` |
-| CA-ENC-09 | Si la publicación del evento de notificación (RabbitMQ) falla al completar la encuesta, la calibración debe completarse exitosamente. La notificación es eventual, no bloquea la transacción. | `[APP]` |
 | CA-ENC-10 | Un usuario solo puede registrar respuestas y completar encuestas propias. El acceso a encuestas de otro usuario debe retornar error 403. | `[APP]` |
 
 ### respuestas_encuesta_calibracion

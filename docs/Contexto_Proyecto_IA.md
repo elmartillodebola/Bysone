@@ -20,7 +20,6 @@
 |------|----------|-----|
 | Base | Funcionalidad completa, POO, auth OAuth2, Docker, despliegue en nube | 90 |
 | Bonus | Tests unitarios | +10 |
-| Bonus | Cola de mensajes real (RabbitMQ) | +10 |
 | Bonus | POO avanzada | +5 |
 | Bonus | Object storage | +5 |
 
@@ -38,7 +37,6 @@
 | Frontend | Next.js 14 (React, App Router, TypeScript) | Fly.io — PaaS |
 | Backend | Java 21 + Spring Boot 3 + Spring MVC (síncrono) | Fly.io — Contenedor |
 | Base de datos | PostgreSQL 16 + JPA/Hibernate (JDBC) | Neon — DBaaS |
-| Cola de mensajes | RabbitMQ | Fly.io — Contenedor |
 | Autenticación | OAuth2 (Google Workspace + Microsoft 365) — NO GitHub | — |
 | Migraciones BD | Flyway (V1 schema + V2 semilla + V3 roles) | — |
 | CI/CD | GitHub Actions → Fly.io deploy | GitHub |
@@ -46,7 +44,7 @@
 
 **Librerías frontend clave:** Tailwind CSS · shadcn/ui · NextAuth.js v5 · Axios · TanStack Query · React Hook Form + Zod · Recharts
 
-**Librerías backend clave:** Spring MVC · JPA/Hibernate · Spring Security OAuth2 · Spring AMQP · SpringDoc OpenAPI · JUnit 5 + Mockito · Spring Actuator
+**Librerías backend clave:** Spring MVC · JPA/Hibernate · Spring Security OAuth2 · SpringDoc OpenAPI · JUnit 5 + Mockito · Spring Actuator
 
 ---
 
@@ -59,12 +57,8 @@ Next.js (3000) ──HTTPS──▶ Spring Boot MVC API (8080)
                                     │
                      ┌──────────────┼──────────────┐
                      │              │              │
-              Neon PostgreSQL   RabbitMQ       Swagger UI
-              (JDBC / JPA)      (broker)       (/swagger-ui.html)
-                                    │
-                            NotificacionConsumer
-                                    │
-                               SMTP / Email
+              Neon PostgreSQL       Swagger UI
+              (JDBC / JPA)          (/swagger-ui.html)
 ```
 
 ### CI/CD
@@ -89,8 +83,7 @@ backend/src/main/java/com/bysone/backend/
 ├── service/              ← Lógica de negocio
 ├── controller/           ← @RestController Spring MVC
 ├── security/             ← JWT + OAuth2 handlers
-├── config/               ← SecurityConfig, RabbitMqConfig, OpenApiConfig, GlobalExceptionHandler
-└── messaging/            ← NotificacionProducer, NotificacionConsumer
+├── config/               ← SecurityConfig, OpenApiConfig, GlobalExceptionHandler
 ```
 
 ### Estructura del frontend (Next.js 14 App Router)
@@ -177,7 +170,7 @@ frontend/src/
 
 | Archivo | Descripción |
 |---------|-------------|
-| `docker-compose.yml` | postgres + rabbitmq + mailhog + backend + frontend |
+| `docker-compose.yml` | postgres + backend + frontend |
 | `.env.example` | Todas las variables con instrucciones |
 | `backend/Dockerfile` | Multistage eclipse-temurin:21 |
 | `frontend/Dockerfile` | Multistage node:20-alpine standalone |
@@ -204,7 +197,6 @@ fly apps create bysone-frontend
 fly secrets set --app bysone-backend DATABASE_URL=... JWT_SECRET=... \
   GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... \
   MICROSOFT_CLIENT_ID=... MICROSOFT_CLIENT_SECRET=... \
-  RABBITMQ_HOST=... RABBITMQ_USERNAME=... RABBITMQ_PASSWORD=... \
   FRONTEND_URL=https://bysone-frontend.fly.dev
 
 fly secrets set --app bysone-frontend \

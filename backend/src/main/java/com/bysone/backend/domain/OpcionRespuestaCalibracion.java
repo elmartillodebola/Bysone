@@ -1,5 +1,6 @@
 package com.bysone.backend.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -15,6 +16,7 @@ public class OpcionRespuestaCalibracion {
     @Column(name = "id_opcion_respuesta")
     private Long id;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_pregunta", nullable = false)
     private PreguntaCalibracion preguntaCalibracion;
